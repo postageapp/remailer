@@ -76,6 +76,20 @@ exhausted:
       STDERR.puts "Sending complete."
     end
 
+The call to send a message can also take a callback method which must receive
+one parameter that will be the numerical status code returned by the SMTP
+server. Success is defined as 250, errors vary:
+
+    connection.send_email(
+      'from@example.net',
+      'to@example.com',
+      email_content
+    ) do |status_code|
+      puts "Message finished with status #{status_code}"
+    end
+
+A status code of nil is sent if the server timed out or the connection failed.
+
 == Status
 
 This software is currently experimental and is not recommended for production
