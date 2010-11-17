@@ -23,6 +23,7 @@ class Test::Unit::TestCase
     
     ThreadsWait.all_waits(
       Thread.new do
+        Thread.abort_on_exception = true
         # Create a thread for the engine to run on
         EventMachine.run
       end,

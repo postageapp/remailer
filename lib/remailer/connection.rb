@@ -14,6 +14,7 @@ class Remailer::Connection < EventMachine::Connection
   attr_accessor :timeout
   attr_reader :state, :mode
   attr_accessor :options
+  attr_reader :remote, :max_size, :protocol
 
   # == Extensions ===========================================================
 
@@ -31,8 +32,6 @@ class Remailer::Connection < EventMachine::Connection
     options[:port] ||= 25
     options[:use_tls] = true unless (options.key?(:use_tls))
     
-    puts "CONNECT #{smtp_server}:#{options[:port]} with #{self}" if (options[:debug])
-
     EventMachine.connect(smtp_server, options[:port], self, options)
   end
   
@@ -48,6 +47,10 @@ class Remailer::Connection < EventMachine::Connection
   # 250-8BITMIME
   # 250-STARTTLS
   # 250 ENHANCEDSTATUSCODES
+  
+  def self.encode_data(data)
+    data.gsub(/((?:\r\n|\n)\.)/m, '\\1.')
+  end
 
   # == Instance Methods =====================================================
   
@@ -57,35 +60,28 @@ class Remailer::Connection < EventMachine::Connection
     @options[:hostname] ||= Socket.gethostname
     @messages = [ ]
     
-    puts "OPTIONS: #{@options}" if (@options[:debug])
+    debug_notification(:options, @options.inspect)
     
     @timeout_at = Time.now + (@timeout || DEFAULT_TIMEOUT)
   end
   
-  def send_line(line = '')
-    send_data(line + CRLF)
+  # Returns true if the connection has advertised TLS support, or false if
+  # not availble or could not be detected. This will only work with ESMTP
+  # capable servers.
+  def tls_support?
+    !!@tls_support
+  end
 
-    puts "-> #{line.inspect}" if (@options[:debug])
+  # This is used to create a callback that will be called if no more messages
+  # are schedueld to be sent.
+  def after_complete(&block)
+    @options[:after_complete] = block
   end
   
-  def post_init
-    @state = :connecting
-  
-    EventMachine.add_periodic_timer(1) do
-      check_for_timeouts!
-    end
+  def close_when_complete!
+    @options[:close] = true
   end
-  
-  def connection_completed
-    @timeout_at = nil
-    @state = :connected
-    @mode = :response
-  end
-  
-  def unbind
-    @state = :closed
-  end
-  
+
   def send_email(from, to, data, &block)
     message = {
       :from => from,
@@ -101,111 +97,207 @@ class Remailer::Connection < EventMachine::Connection
     end
   end
   
+  # Returns the details of the active message being sent, or nil if no message
+  # is being sent.
   def active_message
     @active_message
   end
   
+  # Reassigns the timeout which is specified in seconds. Values equal to
+  # or less than zero are ignored and a default is used instead.
+  def timeout=(value)
+    @timeout = value.to_i
+    @timeout = DEFAULT_TIMEOUT if (@timeout <= 0)
+  end
+  
+  # This implements the EventMachine::Connection#completed method by
+  # flagging the connection as estasblished.
+  def connection_completed
+    @timeout_at = nil
+    @state = :connected
+  end
+  
+  # This implements the EventMachine::Connection#unbind method to capture
+  # a connection closed event.
+  def unbind
+    @state = :closed
+    
+    if (@active_message)
+      if (callback = @active_message[:callback])
+        callback.call(nil)
+      end
+    end
+  end
+
   def receive_data(data)
+    # Data is received in arbitrary sized chunks, so there is no guarantee
+    # a whole line will be ready to process, or that there is only one line.
     @buffer ||= ''
     @buffer << data
     
     while (line_index = @buffer.index(CRLF))
       if (line_index > 0)
-        receive_line(@buffer[0, line_index])
+        receive_reply(@buffer[0, line_index])
       end
 
       @buffer = (@buffer[line_index + CRLF_LENGTH, @buffer.length] || '')
     end
   end
-  
-  def receive_line(line)
-    puts "+> #{line.inspect}" if (@options[:debug])
 
-    return unless (line)
+  def post_init
+    @state = :connecting
+  
+    EventMachine.add_periodic_timer(1) do
+      check_for_timeouts!
+    end
+  end
+
+  def send_line(line = '')
+    send_data(line + CRLF)
+
+    debug_notification(:send, line.inspect)
+  end
+
+  # Returns true if the reply has been completed, or false if it is still
+  # in the process of being received.
+  def reply_complete?
+    !!@reply_complete
+  end
+  
+  def receive_reply(reply)
+    debug_notification(:reply, reply.inspect)
+
+    return unless (reply)
+    
+    if (reply.match(/(\d+)([ \-])(.*)/))
+      reply_code = $1.to_i
+      @reply_complete = $2 != '-'
+      reply_message = $3
+    end
     
     case (state)
     when :connected
-      if (line.match(/^220 (\S+) ESMTP/))
-        @state = :ehello
-        @remote = $1
-        send_line("EHLO #{@options[:hostname]}")
-      end
-    when :ehello
-      if (line.match(/250[ \-]SIZE (\d+)/))
-        @max_size = $1.to_i
-      elsif (line.match(/250[ \-]PIPELINING/))
-        @pipelining = true
-      elsif (line.match(/250[ \-]STARTTLS/))
-        @tls_support = true
-      end
-      
-      # A space after the code indicates the mutli-line response is finished
-      if (line.match(/250 /))
-#        if (@tls_support and @options[:use_tls])
-#          @state = :tls_init
-#        end
-
-        # FIX: Add authentication hook here
-        @state = :ready
+      case (reply_code)
+      when 220
+        reply_parts = reply_message.split(/\s+/)
+        @remote = reply_parts.first
         
-        send_queued_message!
+        if (reply_parts.include?('ESMTP'))
+          @state = :sent_ehlo
+          @protocol = :esmtp
+          send_line("EHLO #{@options[:hostname]}")
+        else
+          @state = :sent_helo
+          @protocol = :smtp
+          send_line("HELO #{@options[:hostname]}")
+        end
+      else
+        fail_unanticipated_response!(reply)
       end
-    when :mail_from
-      if (line.match(/250 /))
-        @state = :rcpt_to
+    when :sent_ehlo
+      case (reply_code)
+      when 250
+        reply_parts = reply_message.split(/\s+/)
+        case (reply_parts[0].to_s.upcase)
+        when 'SIZE'
+          @max_size = reply_parts[1].to_i
+        when 'PIPELINING'
+          @pipelining = true
+        when 'STARTTLS'
+          @tls_support = true
+        end
+      
+        # FIX: Add TLS support
+        #        if (@tls_support and @options[:use_tls])
+        #          @state = :tls_init
+        #        end
+
+        if (@reply_complete)
+          # Add authentication hook
+          @state = :ready
+
+          send_queued_message!
+        end
+      else
+        fail_unanticipated_response!(reply)
+      end
+    when :sent_helo
+      case (reply_code)
+      when 250
+        @state = :ready
+      else
+        fail_unanticipated_response!(reply)
+      end
+    when :sent_mail_from
+      case (reply_code)
+      when 250
+        @state = :sent_rcpt_to
         send_line("RCPT TO:#{@active_message[:to]}")
+      else
+        fail_unanticipated_response!(reply)
       end
-    when :rcpt_to
-      if (line.match(/250 /))
-        @state = :data_pending
+    when :sent_rcpt_to
+      case (reply_code)
+      when 250
+        @state = :sent_data
         send_line("DATA")
         
         @data_offset = 0
+      else
+        fail_unanticipated_response!(reply)
       end
-    when :data_pending
-      if (line.match(/354/))
+    when :sent_data
+      case (reply_code)
+      when 354
         @state = :data_sending
         
         transmit_data_chunk!
+      else
+        fail_unanticipated_response!(reply)
       end
-    when :data_sent
-      if (line.match(/(\d+) /))
-        result = $1.to_i
-        
-        if (callback = @active_message[:callback])
-          callback.call(result)
-        end
-        
-        @state = :ready
-        
-        send_queued_message!
+    when :sent_data_content
+      if (callback = @active_message[:callback])
+        callback.call(reply_code)
       end
-    when :closing
-      if (line.match(/221/))
+      
+      @state = :ready
+      
+      send_queued_message!
+    when :sent_quit
+      case (reply_code)
+      when 221
         @state = :closed
         close_connection
+      else
+        fail_unanticipated_response!(reply)
+      end
+    when :sent_reset
+      case (reply_code)
+      when 250
+        @state = :ready
+        
+        
+        send_queued_message!
       end
     end
   end
   
   def transmit_data_chunk!(chunk_size = nil)
-    # FIX: Data will need to be properly formatted here, with the "dot"
-    # encoding handled as per RFC.
-    
     data = @active_message[:data]
     chunk_size ||= data.length
     
     chunk = data[@data_offset, chunk_size]
-    puts "-> " + chunk.inspect if (@options[:debug])
-    send_data(chunk)
+    debug_notification(:send, chunk.inspect)
+    send_data(self.class.encode_data(data))
     @data_offset += chunk_size
     
     if (@data_offset >= data.length)
+      @state = :sent_data_content
+
       # Ensure that a blank line is sent after the last bit of email content
       # to ensure that the dot is on its own line.
       send_line
       send_line(".")
-      @state = :data_sent
     end
   end
   
@@ -217,22 +309,49 @@ class Remailer::Connection < EventMachine::Connection
     return if (@active_message)
       
     if (@active_message = @messages.shift)
-      @state = :mail_from
+      @state = :sent_mail_from
       send_line("MAIL FROM:#{@active_message[:from]}")
     elsif (@options[:close])
+      if (callback = @options[:after_complete])
+        callback.call
+      end
+
       send_line("QUIT")
-      @state = :closing
+      @state = :sent_quit
     end
   end
 
   def check_for_timeouts!
     return if (!@timeout_at or Time.now < @timeout_at)
 
-    # ...
+    callback(nil)
+    @state = :timeout
+    close_connection
   end
   
-  def timeout=(value)
-    @timeout = value.to_i
-    @timeout = DEFAULT_TIMEOUT if (@timeout <= 0)
+  def debug_notification(type, message)
+    case (@options[:debug])
+    when nil, false
+      # No debugging in this case
+    when Proc
+      @options[:debug].call(type, message)
+    when IO
+      @options[:debug].puts("%s: %s" % [ type, message ])
+    else
+      STDERR.puts("%s: %s" % [ type, message ])
+    end
+  end
+  
+  def fail_unanticipated_response!(reply)
+    if (@active_message)
+      if (callback = @active_message[:callback])
+        callback.call(nil)
+      end
+    end
+    
+    @active_message = nil
+    
+    @state = :sent_reset
+    send_line("RESET")
   end
 end
