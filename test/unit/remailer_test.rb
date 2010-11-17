@@ -41,6 +41,41 @@ class RemailerTest < Test::Unit::TestCase
       assert_equal true, connection.tls_support?
     end
   end
+  
+  def test_connect_with_auth
+    engine do
+      debug = { }
+      
+      connection = Remailer::Connection.open(
+        'smtp.gmail.com',
+        :debug => STDERR,
+        :username => 'remailertester@gmail.com',
+        :password => 'defaults'
+      )
+
+      after_complete_trigger = false
+      
+      connection.close_when_complete!
+      connection.after_complete do
+        after_complete_trigger = true
+      end
+      
+      assert_equal :connecting, connection.state
+      assert !connection.error?
+
+      assert_eventually(15) do
+        connection.state == :closed
+      end
+      
+      assert_equal 'mx.google.com', connection.remote
+      
+      assert_equal true, after_complete_trigger
+      
+      assert_equal 35651584, connection.max_size
+      assert_equal :esmtp, connection.protocol
+      assert_equal true, connection.tls_support?
+    end
+  end
 
   def test_connect_and_send_after_start
     engine do

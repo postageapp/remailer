@@ -51,6 +51,14 @@ class Remailer::Connection < EventMachine::Connection
   def self.encode_data(data)
     data.gsub(/((?:\r\n|\n)\.)/m, '\\1.')
   end
+  
+  def self.base64(string)
+    [ string ].pack('m').chomp
+  end
+  
+  def self.encode_authentication(username, password)
+    base64("\0#{username}\0#{password}")
+  end
 
   # == Instance Methods =====================================================
   
@@ -70,6 +78,10 @@ class Remailer::Connection < EventMachine::Connection
   # capable servers.
   def tls_support?
     !!@tls_support
+  end
+  
+  def requires_authentication?
+    @options[:username]
   end
 
   # This is used to create a callback that will be called if no more messages
@@ -206,17 +218,18 @@ class Remailer::Connection < EventMachine::Connection
         when 'STARTTLS'
           @tls_support = true
         end
-      
-        # FIX: Add TLS support
-        #        if (@tls_support and @options[:use_tls])
-        #          @state = :tls_init
-        #        end
 
         if (@reply_complete)
-          # Add authentication hook
-          @state = :ready
+          if (@options[:use_tls])
+            send_line("STARTTLS")
+            @state = :sent_starttls
+          elsif (requires_authentication?)
+            start_authentication
+          else
+            @state = :ready
 
-          send_queued_message!
+            send_queued_message!
+          end
         end
       else
         fail_unanticipated_response!(reply)
@@ -225,6 +238,30 @@ class Remailer::Connection < EventMachine::Connection
       case (reply_code)
       when 250
         @state = :ready
+      else
+        fail_unanticipated_response!(reply)
+      end
+    when :sent_starttls
+      case (reply_code)
+      when 220
+        start_tls
+        
+        if (requires_authentication?)
+          start_authentication
+        else
+          @state = :ready
+
+          send_queued_message!
+        end
+      else
+        fail_unanticipated_response!(reply)
+      end
+    when :sent_auth
+      case (reply_code)
+      when 235
+        @state = :ready
+
+        send_queued_message!
       else
         fail_unanticipated_response!(reply)
       end
@@ -280,6 +317,11 @@ class Remailer::Connection < EventMachine::Connection
         send_queued_message!
       end
     end
+  end
+  
+  def start_authentication
+    send_line("AUTH PLAIN #{self.class.encode_authentication(@options[:username], @options[:password])}")
+    @state = :sent_auth
   end
   
   def transmit_data_chunk!(chunk_size = nil)
@@ -348,6 +390,8 @@ class Remailer::Connection < EventMachine::Connection
         callback.call(nil)
       end
     end
+    
+    debug_notification(:error, "#{@state} - #{reply}")
     
     @active_message = nil
     
