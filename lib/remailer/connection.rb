@@ -2,6 +2,10 @@ require 'socket'
 require 'eventmachine'
 
 class Remailer::Connection < EventMachine::Connection
+  # == Exceptions ===========================================================
+  
+  class CallbackArgumentsRequired < Exception; end
+
   # == Constants ============================================================
   
   DEFAULT_TIMEOUT = 5
@@ -95,6 +99,15 @@ class Remailer::Connection < EventMachine::Connection
   end
 
   def send_email(from, to, data, &block)
+    if (block_given?)
+      case (block.arity)
+      when 1, 2
+        # This is okay, accept as-is
+      else
+        raise CallbackArgumentsRequired, "Call to send_email requires a block that takes 1 or 2 arguments"
+      end
+    end
+    
     message = {
       :from => from,
       :to => to,
@@ -187,6 +200,7 @@ class Remailer::Connection < EventMachine::Connection
       reply_message = $3
     end
     
+    # The connection itself will be in a particular state.
     case (state)
     when :connected
       case (reply_code)
@@ -204,7 +218,7 @@ class Remailer::Connection < EventMachine::Connection
           send_line("HELO #{@options[:hostname]}")
         end
       else
-        fail_unanticipated_response!(reply)
+        fail_unanticipated_response!(reply_code, reply_message)
       end
     when :sent_ehlo
       case (reply_code)
@@ -232,14 +246,14 @@ class Remailer::Connection < EventMachine::Connection
           end
         end
       else
-        fail_unanticipated_response!(reply)
+        fail_unanticipated_response!(reply_code, reply_message)
       end
     when :sent_helo
       case (reply_code)
       when 250
         @state = :ready
       else
-        fail_unanticipated_response!(reply)
+        fail_unanticipated_response!(reply_code, reply_message)
       end
     when :sent_starttls
       case (reply_code)
@@ -254,7 +268,7 @@ class Remailer::Connection < EventMachine::Connection
           send_queued_message!
         end
       else
-        fail_unanticipated_response!(reply)
+        fail_unanticipated_response!(reply_code, reply_message)
       end
     when :sent_auth
       case (reply_code)
@@ -263,7 +277,7 @@ class Remailer::Connection < EventMachine::Connection
 
         send_queued_message!
       else
-        fail_unanticipated_response!(reply)
+        fail_unanticipated_response!(reply_code, reply_message)
       end
     when :sent_mail_from
       case (reply_code)
@@ -271,7 +285,7 @@ class Remailer::Connection < EventMachine::Connection
         @state = :sent_rcpt_to
         send_line("RCPT TO:#{@active_message[:to]}")
       else
-        fail_unanticipated_response!(reply)
+        fail_unanticipated_response!(reply_code, reply_message)
       end
     when :sent_rcpt_to
       case (reply_code)
@@ -281,7 +295,7 @@ class Remailer::Connection < EventMachine::Connection
         
         @data_offset = 0
       else
-        fail_unanticipated_response!(reply)
+        fail_unanticipated_response!(reply_code, reply_message)
       end
     when :sent_data
       case (reply_code)
@@ -290,7 +304,7 @@ class Remailer::Connection < EventMachine::Connection
         
         transmit_data_chunk!
       else
-        fail_unanticipated_response!(reply)
+        fail_unanticipated_response!(reply_code, reply_message)
       end
     when :sent_data_content
       if (callback = @active_message[:callback])
@@ -306,7 +320,7 @@ class Remailer::Connection < EventMachine::Connection
         @state = :closed
         close_connection
       else
-        fail_unanticipated_response!(reply)
+        fail_unanticipated_response!(reply_code, reply_message)
       end
     when :sent_reset
       case (reply_code)
@@ -384,14 +398,22 @@ class Remailer::Connection < EventMachine::Connection
     end
   end
   
-  def fail_unanticipated_response!(reply)
-    if (@active_message)
-      if (callback = @active_message[:callback])
-        callback.call(nil)
+  def send_callback(reply_code, reply_message)
+    if (callback = (@active_message and @active_message[:callback]))
+      # The callback is screened in advance when assigned to ensure that it
+      # has only 1 or 2 arguments. There should be no else here.
+      case (callback.arity)
+      when 2
+        callback.call(reply_code, reply_message)
+      when 1
+        callback.call(reply_code)
       end
     end
-    
-    debug_notification(:error, "#{@state} - #{reply}")
+  end
+  
+  def fail_unanticipated_response!(reply_code, reply_message)
+    send_callback(reply_code, reply_message)
+    debug_notification(:error, "[#{@state}] #{reply}")
     
     @active_message = nil
     
