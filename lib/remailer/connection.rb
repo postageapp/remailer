@@ -39,19 +39,6 @@ class Remailer::Connection < EventMachine::Connection
     EventMachine.connect(smtp_server, options[:port], self, options)
   end
   
-  # EHLO address
-  # MAIL FROM:<reverse-path> [SP <mail-parameters> ] <CRLF>
-  # RCPT TO:<forward-path> [ SP <rcpt-parameters> ] <CRLF>
-  # DATA <CRLF>
-  # NOOP
-  # QUIT
-  
-  # 250-mx.google.com at your service, [99.231.152.248]
-  # 250-SIZE 35651584
-  # 250-8BITMIME
-  # 250-STARTTLS
-  # 250 ENHANCEDSTATUSCODES
-  
   def self.encode_data(data)
     data.gsub(/((?:\r\n|\n)\.)/m, '\\1.')
   end
@@ -84,8 +71,10 @@ class Remailer::Connection < EventMachine::Connection
     !!@tls_support
   end
   
+  # Returns true if the connection will require authentication to complete,
+  # that is a username has been supplied in the options, or false otherwise.
   def requires_authentication?
-    @options[:username]
+    @options[:username] and !@options[:username].empty?
   end
 
   # This is used to create a callback that will be called if no more messages
@@ -94,10 +83,14 @@ class Remailer::Connection < EventMachine::Connection
     @options[:after_complete] = block
   end
   
+  # Closes the connection after all of the queued messages have been sent.
   def close_when_complete!
     @options[:close] = true
   end
 
+  # Sends an email message through the connection at the earliest opportunity.
+  # A callback block can be supplied that will be executed when the message
+  # has been sent, an unexpected result occurred, or the send timed out.
   def send_email(from, to, data, &block)
     if (block_given?)
       case (block.arity)
@@ -177,6 +170,7 @@ class Remailer::Connection < EventMachine::Connection
     end
   end
 
+protected
   def send_line(line = '')
     send_data(line + CRLF)
 
@@ -302,7 +296,7 @@ class Remailer::Connection < EventMachine::Connection
       when 354
         @state = :data_sending
         
-        transmit_data_chunk!
+        transmit_data!
       else
         fail_unanticipated_response!(reply_code, reply_message)
       end
@@ -338,10 +332,12 @@ class Remailer::Connection < EventMachine::Connection
     @state = :sent_auth
   end
   
-  def transmit_data_chunk!(chunk_size = nil)
+  def transmit_data!(chunk_size = nil)
     data = @active_message[:data]
     chunk_size ||= data.length
     
+    # This chunk-based sending will work better when/if EventMachine can be
+    # configured to support 'writable' notifications on the active socket.
     chunk = data[@data_offset, chunk_size]
     debug_notification(:send, chunk.inspect)
     send_data(self.class.encode_data(data))
@@ -355,10 +351,6 @@ class Remailer::Connection < EventMachine::Connection
       send_line
       send_line(".")
     end
-  end
-  
-  def notify_writable
-    # FIXME: Get EventMachine to trigger this
   end
 
   def send_queued_message!
@@ -380,7 +372,8 @@ class Remailer::Connection < EventMachine::Connection
   def check_for_timeouts!
     return if (!@timeout_at or Time.now < @timeout_at)
 
-    callback(nil)
+    send_callback(:timeout, "Connection timed out before send could complete")
+
     @state = :timeout
     close_connection
   end
