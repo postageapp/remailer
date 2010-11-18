@@ -9,9 +9,42 @@ class Remailer::Connection < EventMachine::Connection
   # == Constants ============================================================
   
   DEFAULT_TIMEOUT = 5
-  SMTP_PORT = 25
   CRLF = "\r\n".freeze
   CRLF_LENGTH = CRLF.length
+
+  SMTP_PORT = 25
+  SOCKS5_PORT = 1080
+  
+  SOCKS5_VERSION = 5
+
+  SOCKS5_METHOD = {
+    :no_auth => 0,
+    :gssapi => 1,
+    :username_password => 2
+  }.freeze
+  
+  SOCKS5_COMMAND = {
+    :connect => 1,
+    :bind => 2
+  }.freeze
+  
+  SOCKS5_REPLY = {
+    0 => 'Succeeded',
+    1 => 'General SOCKS server failure',
+    2 => 'Connection not allowed',
+    3 => 'Network unreachable',
+    4 => 'Host unreachable',
+    5 => 'Connection refused',
+    6 => 'TTL expired',
+    7 => 'Command not supported',
+    8 => 'Address type not supported'
+  }.freeze
+  
+  SOCKS5_ADDRESS_TYPE = {
+    :ipv4 => 1,
+    :domainname => 3,
+    :ipv6 => 4
+  }.freeze
   
   # == Properties ===========================================================
   
@@ -33,10 +66,19 @@ class Remailer::Connection < EventMachine::Connection
   # * use_tls => Will use TLS if availble (default is true)
   def self.open(smtp_server, options = nil)
     options ||= { }
+    options[:host] = smtp_server
     options[:port] ||= 25
     options[:use_tls] = true unless (options.key?(:use_tls))
     
-    EventMachine.connect(smtp_server, options[:port], self, options)
+    host_name = smtp_server
+    host_port = options[:port]
+    
+    if (options[:proxy])
+      host_name = options[:proxy][:host]
+      host_port = options[:proxy][:port] || SOCKS5_PORT
+    end
+
+    EventMachine.connect(host_name, host_port, self, options)
   end
   
   def self.encode_data(data)
@@ -61,7 +103,7 @@ class Remailer::Connection < EventMachine::Connection
     
     debug_notification(:options, @options.inspect)
     
-    @timeout_at = Time.now + (@timeout || DEFAULT_TIMEOUT)
+    reset_timeout!
   end
   
   # Returns true if the connection has advertised TLS support, or false if
@@ -69,6 +111,12 @@ class Remailer::Connection < EventMachine::Connection
   # capable servers.
   def tls_support?
     !!@tls_support
+  end
+  
+  # Returns true if the connection will be using a proxy to connect, false
+  # otherwise.
+  def using_proxy?
+    !!@options[:proxy]
   end
   
   # Returns true if the connection will require authentication to complete,
@@ -110,7 +158,9 @@ class Remailer::Connection < EventMachine::Connection
     
     @messages << message
     
+    # If the connection is ready to send...
     if (@state == :ready)
+      # ...send the message right away.
       send_queued_message!
     end
   end
@@ -132,7 +182,12 @@ class Remailer::Connection < EventMachine::Connection
   # flagging the connection as estasblished.
   def connection_completed
     @timeout_at = nil
-    @state = :connected
+    
+    if (using_proxy?)
+      enter_proxy_init_state!
+    else
+      @state = :connected
+    end
   end
   
   # This implements the EventMachine::Connection#unbind method to capture
@@ -148,17 +203,45 @@ class Remailer::Connection < EventMachine::Connection
   end
 
   def receive_data(data)
-    # Data is received in arbitrary sized chunks, so there is no guarantee
-    # a whole line will be ready to process, or that there is only one line.
-    @buffer ||= ''
-    @buffer << data
+    # FIX: Buffer the data anyway.
     
-    while (line_index = @buffer.index(CRLF))
-      if (line_index > 0)
-        receive_reply(@buffer[0, line_index])
+    case (state)
+    when :proxy_init
+      version, method = data.unpack('CC')
+      
+      if (method == SOCKS5_METHOD[:username_password])
+        enter_proxy_authentication_state!
+      else
+        enter_proxy_connecting_state!
       end
+    when :proxy_connecting
+      version, reply, reserved, address_type, address, port = data.unpack('CCCCNn')
+      
+      case (reply)
+      when 0
+        @state = :connected
+      else
+        debug(:error, "Proxy server returned error code #{reply}: #{SOCKS5_REPLY[reply]}")
+        close_connection
+        @state = :failed
+      end
+    when :proxy_authenticating
+      # Decode response of authentication request...
+      
+      # ...
+    else
+      # Data is received in arbitrary sized chunks, so there is no guarantee
+      # a whole line will be ready to process, or that there is only one line.
+      @buffer ||= ''
+      @buffer << data
+    
+      while (line_index = @buffer.index(CRLF))
+        if (line_index > 0)
+          receive_reply(@buffer[0, line_index])
+        end
 
-      @buffer = (@buffer[line_index + CRLF_LENGTH, @buffer.length] || '')
+        @buffer = (@buffer[line_index + CRLF_LENGTH, @buffer.length] || '')
+      end
     end
   end
 
@@ -183,6 +266,16 @@ protected
     !!@reply_complete
   end
   
+  def resolve_hostname(hostname)
+    # FIXME: Elminitate this potentially blocking call by using an async
+    #        resolver if available.
+    record = Socket.gethostbyname(hostname)
+    
+    record and record.last
+  rescue
+    nil
+  end
+
   def receive_reply(reply)
     debug_notification(:reply, reply.inspect)
 
@@ -234,9 +327,7 @@ protected
           elsif (requires_authentication?)
             start_authentication
           else
-            @state = :ready
-
-            send_queued_message!
+            enter_ready_state!
           end
         end
       else
@@ -245,7 +336,7 @@ protected
     when :sent_helo
       case (reply_code)
       when 250
-        @state = :ready
+        enter_ready_state!
       else
         fail_unanticipated_response!(reply_code, reply_message)
       end
@@ -257,9 +348,7 @@ protected
         if (requires_authentication?)
           start_authentication
         else
-          @state = :ready
-
-          send_queued_message!
+          enter_ready_state!
         end
       else
         fail_unanticipated_response!(reply_code, reply_message)
@@ -267,9 +356,7 @@ protected
     when :sent_auth
       case (reply_code)
       when 235
-        @state = :ready
-
-        send_queued_message!
+        enter_ready_state!
       else
         fail_unanticipated_response!(reply_code, reply_message)
       end
@@ -301,13 +388,9 @@ protected
         fail_unanticipated_response!(reply_code, reply_message)
       end
     when :sent_data_content
-      if (callback = @active_message[:callback])
-        callback.call(reply_code)
-      end
+      send_callback(reply_code, reply_message)
       
-      @state = :ready
-      
-      send_queued_message!
+      enter_ready_state!
     when :sent_quit
       case (reply_code)
       when 221
@@ -319,12 +402,82 @@ protected
     when :sent_reset
       case (reply_code)
       when 250
-        @state = :ready
-        
-        
-        send_queued_message!
+        enter_ready_state!
       end
     end
+  end
+  
+  def enter_proxy_init_state!
+    debug_notification(:proxy, "Initiating proxy connection through #{@options[:proxy][:host]}")
+
+    socks_methods = [ ]
+    
+    if (@options[:proxy][:username])
+      socks_methods << SOCKS5_METHOD[:username_password]
+    end
+    
+    send_data(
+      [
+        SOCKS5_VERSION,
+        socks_methods.length,
+        socks_methods
+      ].flatten.pack('CCC*')
+    )
+
+    @state = :proxy_init
+  end
+  
+  def enter_proxy_connecting_state!
+    # REFACTOR: Move the resolution of the hostname to an earlier point to
+    #           avoid connecting needlessly.
+    
+    debug_notification(:proxy, "Sending proxy connection request to #{@options[:host]}:#{@options[:port]}")
+    
+    if (ip_address = resolve_hostname(@options[:host]))
+      send_data(
+        [
+          SOCKS5_VERSION,
+          SOCKS5_COMMAND[:connect],
+          0,
+          SOCKS5_ADDRESS_TYPE[:ipv4],
+          ip_address,
+          @options[:port]
+        ].pack('CCCCA4n')
+      )
+      
+      @state = :proxy_connecting
+    else
+      send_callback(:error_connecting, "Could not resolve hostname #{@options[:host]}")
+      
+      @state = :failed
+      close_connection
+    end
+  end
+  
+  def enter_proxy_authenticating_state!
+    debug_notification(:proxy, "Sending proxy authentication")
+
+    proxy_options = @options[:proxy]
+    username = proxy_options[:username]
+    password = proxy_options[:password]
+    
+    send_data(
+      [
+        SOCKS5_VERSION,
+        username.length,
+        username,
+        password.length,
+        password
+      ].pack('CCA*CA*')
+    )
+    
+    @state = :proxy_authenticating
+  end
+  
+  def enter_ready_state!
+    @state = :ready
+    
+    send_queued_message!
   end
   
   def start_authentication
@@ -352,9 +505,15 @@ protected
       send_line(".")
     end
   end
+  
+  def reset_timeout!
+    @timeout_at = Time.now + (@timeout_at || DEFAULT_TIMEOUT)
+  end
 
   def send_queued_message!
     return if (@active_message)
+    
+    reset_timeout!
       
     if (@active_message = @messages.shift)
       @state = :sent_mail_from
