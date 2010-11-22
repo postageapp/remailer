@@ -46,6 +46,12 @@ class Remailer::Connection < EventMachine::Connection
     :ipv6 => 4
   }.freeze
   
+  NOTIFICATIONS = [
+    :debug,
+    :error,
+    :connect
+  ].freeze
+  
   # == Properties ===========================================================
   
   attr_accessor :timeout
@@ -73,9 +79,9 @@ class Remailer::Connection < EventMachine::Connection
     host_name = smtp_server
     host_port = options[:port]
     
-    if (options[:proxy])
-      host_name = options[:proxy][:host]
-      host_port = options[:proxy][:port] || SOCKS5_PORT
+    if (proxy_options = options[:proxy])
+      host_name = proxy_options[:host]
+      host_port = proxy_options[:port] || SOCKS5_PORT
     end
 
     EventMachine.connect(host_name, host_port, self, options)
@@ -92,18 +98,39 @@ class Remailer::Connection < EventMachine::Connection
   def self.encode_authentication(username, password)
     base64("\0#{username}\0#{password}")
   end
+  
+  def self.warn_about_arguments(proc, range)
+    unless (range.include?(proc.arity) or proc.arity == -1)
+      STDERR.puts "Callback must accept #{[ range.min, range.max ].uniq.join(' to ')} arguments but accepts #{proc.arity}"
+    end
+  end
 
   # == Instance Methods =====================================================
   
   def initialize(options)
-    @options = options
+    # Throwing exceptions inside this block is going to cause EventMachine
+    # to malfunction in a spectacular way and hide the actual exception. To
+    # allow for debugging, exceptions are dumped to STDERR as a last resort.
+    begin
+      @options = options
 
-    @options[:hostname] ||= Socket.gethostname
-    @messages = [ ]
+      @options[:hostname] ||= Socket.gethostname
+      @messages = [ ]
     
-    debug_notification(:options, @options.inspect)
+      NOTIFICATIONS.each do |type|
+        callback = @options[type]
+
+        if (callback.is_a?(Proc))
+          self.class.warn_about_arguments(callback, (2..2))
+        end
+      end
     
-    reset_timeout!
+      debug_notification(:options, @options.inspect)
+    
+      reset_timeout!
+    rescue Object => e
+      STDERR.puts "#{e.class}: #{e}"
+    end
   end
   
   # Returns true if the connection has advertised TLS support, or false if
@@ -141,12 +168,7 @@ class Remailer::Connection < EventMachine::Connection
   # has been sent, an unexpected result occurred, or the send timed out.
   def send_email(from, to, data, &block)
     if (block_given?)
-      case (block.arity)
-      when 1, 2
-        # This is okay, accept as-is
-      else
-        raise CallbackArgumentsRequired, "Call to send_email requires a block that takes 1 or 2 arguments"
-      end
+      self.class.warn_about_arguments(block, 1..2)
     end
     
     message = {
@@ -186,7 +208,9 @@ class Remailer::Connection < EventMachine::Connection
     if (using_proxy?)
       enter_proxy_init_state!
     else
+      connect_notification(true, "Connection completed")
       @state = :connected
+      @connected = true
     end
   end
   
@@ -220,8 +244,11 @@ class Remailer::Connection < EventMachine::Connection
       case (reply)
       when 0
         @state = :connected
+        @connected = true
+        connect_notification(true, "Connection completed")
       else
         debug(:error, "Proxy server returned error code #{reply}: #{SOCKS5_REPLY[reply]}")
+        connect_notification(false, "Proxy server returned error code #{reply}: #{SOCKS5_REPLY[reply]}")
         close_connection
         @state = :failed
       end
@@ -271,6 +298,8 @@ protected
     #        resolver if available.
     record = Socket.gethostbyname(hostname)
     
+    debug_notification(:resolved, record && record.last)
+
     record and record.last
   rescue
     nil
@@ -285,6 +314,8 @@ protected
       reply_code = $1.to_i
       @reply_complete = $2 != '-'
       reply_message = $3
+      
+      debug_notification(:recv, reply)
     end
     
     # The connection itself will be in a particular state.
@@ -325,7 +356,7 @@ protected
             send_line("STARTTLS")
             @state = :sent_starttls
           elsif (requires_authentication?)
-            start_authentication
+            enter_sent_auth_state!
           else
             enter_ready_state!
           end
@@ -346,7 +377,7 @@ protected
         start_tls
         
         if (requires_authentication?)
-          start_authentication
+          enter_sent_auth_state!
         else
           enter_ready_state!
         end
@@ -480,7 +511,7 @@ protected
     send_queued_message!
   end
   
-  def start_authentication
+  def enter_sent_auth_state!
     send_line("AUTH PLAIN #{self.class.encode_authentication(@options[:username], @options[:password])}")
     @state = :sent_auth
   end
@@ -507,7 +538,7 @@ protected
   end
   
   def reset_timeout!
-    @timeout_at = Time.now + (@timeout_at || DEFAULT_TIMEOUT)
+    @timeout_at = Time.now + (@options[:timeout] || DEFAULT_TIMEOUT)
   end
 
   def send_queued_message!
@@ -531,25 +562,44 @@ protected
   def check_for_timeouts!
     return if (!@timeout_at or Time.now < @timeout_at)
 
+    error_notification(:timeout, "Connection timed out")
+    debug_notification(:timeout, "Connection timed out")
     send_callback(:timeout, "Connection timed out before send could complete")
 
     @state = :timeout
+
+    unless (@connected)
+      connect_notification(false, "Connection timed out")
+    end
+
     close_connection
   end
   
-  def debug_notification(type, message)
-    case (@options[:debug])
+  def send_notification(type, code, message)
+    case (callback = @options[type])
     when nil, false
-      # No debugging in this case
+      # No notification in this case
     when Proc
-      @options[:debug].call(type, message)
+      callback.call(code, message)
     when IO
-      @options[:debug].puts("%s: %s" % [ type, message ])
+      callback.puts("%s: %s" % [ code.to_s, message ])
     else
-      STDERR.puts("%s: %s" % [ type, message ])
+      STDERR.puts("%s: %s" % [ code.to_s, message ])
     end
   end
   
+  def connect_notification(code, message)
+    send_notification(:connect, code, message)
+  end
+
+  def error_notification(code, message)
+    send_notification(:error, code, message)
+  end
+
+  def debug_notification(code, message)
+    send_notification(:debug, code, message)
+  end
+
   def send_callback(reply_code, reply_message)
     if (callback = (@active_message and @active_message[:callback]))
       # The callback is screened in advance when assigned to ensure that it
@@ -565,7 +615,8 @@ protected
   
   def fail_unanticipated_response!(reply_code, reply_message)
     send_callback(reply_code, reply_message)
-    debug_notification(:error, "[#{@state}] #{reply}")
+    debug_notification(:error, "[#{@state}] #{reply_code} #{reply_message}")
+    error_notification(reply_code, reply_message)
     
     @active_message = nil
     

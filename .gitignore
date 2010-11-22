@@ -1,5 +1,7 @@
 *.gem
 
+config.rb
+
 ## MAC OS
 .DS_Store
 

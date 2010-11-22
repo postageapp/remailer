@@ -1,8 +1,6 @@
 require File.expand_path(File.join(*%w[ .. helper ]), File.dirname(__FILE__))
 
 class RemailerTest < Test::Unit::TestCase
-  TEST_SMTP_SERVER = 'mail.postageapp.com'.freeze
-  
   def test_encode_data
     sample_data = "Line 1\r\nLine 2\r\n.\r\nLine 3\r\n.Line 4\r\n"
     
@@ -14,7 +12,7 @@ class RemailerTest < Test::Unit::TestCase
       debug = { }
       
       connection = Remailer::Connection.open(
-        TEST_SMTP_SERVER,
+        TestConfig.smtp_server[:host],
         :debug => STDERR
       )
 
@@ -32,7 +30,7 @@ class RemailerTest < Test::Unit::TestCase
         connection.state == :closed
       end
       
-      assert_equal TEST_SMTP_SERVER, connection.remote
+      assert_equal TestConfig.smtp_server[:host], connection.remote
       
       assert_equal true, after_complete_trigger
       
@@ -42,15 +40,37 @@ class RemailerTest < Test::Unit::TestCase
     end
   end
   
+  def test_failed_connect
+    engine do
+      error_received = nil
+      
+      connection = Remailer::Connection.open(
+        'example.com',
+        :debug => STDERR,
+        :error => lambda { |code, message|
+          error_received = [ code, message ]
+        },
+        :timeout => 1
+      )
+      
+      assert_eventually(3) do
+        error_received
+      end
+      
+      assert_equal :timeout, error_received[0]
+    end
+  end
+
   def test_connect_with_auth
     engine do
       debug = { }
       
       connection = Remailer::Connection.open(
-        'smtp.gmail.com',
+        TestConfig.public_smtp_server[:host],
+        :port => 587,
         :debug => STDERR,
-        :username => 'remailertester@gmail.com',
-        :password => 'defaults'
+        :username => TestConfig.public_smtp_server[:username],
+        :password => TestConfig.public_smtp_server[:password]
       )
 
       after_complete_trigger = false
@@ -67,7 +87,7 @@ class RemailerTest < Test::Unit::TestCase
         connection.state == :closed
       end
       
-      assert_equal 'mx.google.com', connection.remote
+      assert_equal TestConfig.public_smtp_server[:identifier], connection.remote
       
       assert_equal true, after_complete_trigger
       
@@ -82,11 +102,11 @@ class RemailerTest < Test::Unit::TestCase
       debug = { }
 
       connection = Remailer::Connection.open(
-        TEST_SMTP_SERVER,
+        TestConfig.smtp_server[:host],
         :debug => STDERR,
         :proxy => {
           :proto => :socks5,
-          :host => 'work1.green.postageapp.com'
+          :host => TestConfig.proxy_server
         }
       )
 
@@ -104,7 +124,7 @@ class RemailerTest < Test::Unit::TestCase
         connection.state == :closed
       end
 
-      assert_equal TEST_SMTP_SERVER, connection.remote
+      assert_equal TestConfig.smtp_server[:identifier], connection.remote
 
       assert_equal true, after_complete_trigger
 
@@ -117,7 +137,7 @@ class RemailerTest < Test::Unit::TestCase
   def test_connect_and_send_after_start
     engine do
       connection = Remailer::Connection.open(
-        TEST_SMTP_SERVER,
+        TestConfig.smtp_server[:host],
         :debug => STDERR
       )
       
@@ -145,7 +165,7 @@ class RemailerTest < Test::Unit::TestCase
   def test_connect_and_send_dotted_message
     engine do
       connection = Remailer::Connection.open(
-        TEST_SMTP_SERVER,
+        TestConfig.smtp_server[:host],
         :debug => STDERR
       )
       
@@ -169,15 +189,14 @@ class RemailerTest < Test::Unit::TestCase
 
   def test_connect_and_long_send
     engine do
-      connection = Remailer::Connection.open('twgmail.twg.ca')
+      connection = Remailer::Connection.open(TestConfig.smtp_server[:host])
       
       assert_equal :connecting, connection.state
-      assert !connection.error?
       
       result_code = nil
       connection.send_email(
-        'sender@postageapp.com',
-        'remailer+test@example.postageapp.com',
+        TestConfig.sender,
+        TestConfig.receiver,
         example_message + 'a' * 100000
       ) do |c|
         result_code = c
@@ -193,9 +212,9 @@ protected
   def example_message
     example = <<__END__
 Date: Sat, 13 Nov 2010 02:25:24 +0000
-From: sender@postageapp.com
-To: Remailer Test <remailer@twg.ca>
-Message-Id: <hfLkcIByfjYoNIxCO7DMsxBTX9svsFHikIOfAiYy@twg.ca>
+From: #{TestConfig.sender}
+To: Remailer Test <#{TestConfig.receiver}>
+Message-Id: <hfLkcIByfjYoNIxCO7DMsxBTX9svsFHikIOfAiYy@#{TestConfig.sender.split(/@/).last}>
 Subject: Example Subject
 Mime-Version: 1.0
 Content-Type: text/plain
