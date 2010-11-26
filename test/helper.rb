@@ -17,6 +17,39 @@ end
 
 require 'remailer'
 
+class Proc
+  def inspect
+    "\#<Proc: #{object_id}>"
+  end
+end
+
+unless (Hash.respond_to?(:slice))
+  class Hash
+    def slice(*keys)
+      keys.inject({ }) do |h, k|
+        h[k] = self[k]
+        h
+      end
+    end
+  end
+end
+
+module TestTriggerHelper
+  def self.included(base)
+    base.class_eval do
+      attr_reader :triggered
+      
+      def triggered
+        @triggered ||= Hash.new(false)
+      end
+      
+      def trigger(action, value = true)
+        self.triggered[action] = value
+      end
+    end
+  end
+end
+
 class Test::Unit::TestCase
   def engine
     exception = nil
@@ -60,6 +93,23 @@ class Test::Unit::TestCase
         flunk(message || 'assert_eventually timed out')
       end
     end
+  end
+
+  def assert_mapping(map, &block)
+    result_map = map.inject({ }) do |h, (k,v)|
+      h[k] = yield(k)
+      h
+    end
+    
+    differences = result_map.inject([ ]) do |a, (k,v)|
+      if (v != map[k])
+        a << k
+      end
+
+      a
+    end
+    
+    assert_equal map, result_map, "Difference: #{map.slice(*differences).inspect} vs #{result_map.slice(*differences).inspect}"
   end
 end
 

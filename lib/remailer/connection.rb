@@ -6,6 +6,10 @@ class Remailer::Connection < EventMachine::Connection
   
   class CallbackArgumentsRequired < Exception; end
 
+  # == Submodules ===========================================================
+  
+  autoload(:State, 'remailer/connection/state')
+
   # == Constants ============================================================
   
   DEFAULT_TIMEOUT = 5
@@ -54,10 +58,10 @@ class Remailer::Connection < EventMachine::Connection
   
   # == Properties ===========================================================
   
-  attr_accessor :timeout
   attr_reader :state, :mode
-  attr_accessor :options
   attr_reader :remote, :max_size, :protocol
+  attr_accessor :timeout
+  attr_accessor :options
 
   # == Extensions ===========================================================
 
@@ -92,7 +96,7 @@ class Remailer::Connection < EventMachine::Connection
   end
   
   def self.base64(string)
-    [ string ].pack('m').chomp
+    [ string.to_s ].pack('m').chomp
   end
   
   def self.encode_authentication(username, password)
@@ -104,6 +108,10 @@ class Remailer::Connection < EventMachine::Connection
       STDERR.puts "Callback must accept #{[ range.min, range.max ].uniq.join(' to ')} arguments but accepts #{proc.arity}"
     end
   end
+  
+  def self.split_reply(reply)
+    reply.match(/(\d+)([ \-])(.*)/) and [ $1.to_i, $3, $2 == '-' ]
+  end
 
   # == Instance Methods =====================================================
   
@@ -111,26 +119,26 @@ class Remailer::Connection < EventMachine::Connection
     # Throwing exceptions inside this block is going to cause EventMachine
     # to malfunction in a spectacular way and hide the actual exception. To
     # allow for debugging, exceptions are dumped to STDERR as a last resort.
-    begin
-      @options = options
+    @options = options
 
-      @options[:hostname] ||= Socket.gethostname
-      @messages = [ ]
+    @options[:hostname] ||= Socket.gethostname
+    @messages = [ ]
     
-      NOTIFICATIONS.each do |type|
-        callback = @options[type]
+    @state = Remailer::Connection::State.new
+  
+    NOTIFICATIONS.each do |type|
+      callback = @options[type]
 
-        if (callback.is_a?(Proc))
-          self.class.warn_about_arguments(callback, (2..2))
-        end
+      if (callback.is_a?(Proc))
+        self.class.warn_about_arguments(callback, (2..2))
       end
-    
-      debug_notification(:options, @options.inspect)
-    
-      reset_timeout!
-    rescue Object => e
-      STDERR.puts "#{e.class}: #{e}"
     end
+  
+    debug_notification(:options, @options.inspect)
+  
+    reset_timeout!
+  rescue Object => e
+    STDERR.puts "#{e.class}: #{e}"
   end
   
   # Returns true if the connection has advertised TLS support, or false if
@@ -310,132 +318,9 @@ protected
 
     return unless (reply)
     
-    if (reply.match(/(\d+)([ \-])(.*)/))
-      reply_code = $1.to_i
-      @reply_complete = $2 != '-'
-      reply_message = $3
-      
-      debug_notification(:recv, reply)
-    end
+    reply_code, reply_message, @reply_continued = self.class.split_reply(reply)
     
-    # The connection itself will be in a particular state.
-    case (state)
-    when :connected
-      case (reply_code)
-      when 220
-        reply_parts = reply_message.split(/\s+/)
-        @remote = reply_parts.first
-        
-        if (reply_parts.include?('ESMTP'))
-          @state = :sent_ehlo
-          @protocol = :esmtp
-          send_line("EHLO #{@options[:hostname]}")
-        else
-          @state = :sent_helo
-          @protocol = :smtp
-          send_line("HELO #{@options[:hostname]}")
-        end
-      else
-        fail_unanticipated_response!(reply_code, reply_message)
-      end
-    when :sent_ehlo
-      case (reply_code)
-      when 250
-        reply_parts = reply_message.split(/\s+/)
-        case (reply_parts[0].to_s.upcase)
-        when 'SIZE'
-          @max_size = reply_parts[1].to_i
-        when 'PIPELINING'
-          @pipelining = true
-        when 'STARTTLS'
-          @tls_support = true
-        end
-
-        if (@reply_complete)
-          if (@options[:use_tls])
-            send_line("STARTTLS")
-            @state = :sent_starttls
-          elsif (requires_authentication?)
-            enter_sent_auth_state!
-          else
-            enter_ready_state!
-          end
-        end
-      else
-        fail_unanticipated_response!(reply_code, reply_message)
-      end
-    when :sent_helo
-      case (reply_code)
-      when 250
-        enter_ready_state!
-      else
-        fail_unanticipated_response!(reply_code, reply_message)
-      end
-    when :sent_starttls
-      case (reply_code)
-      when 220
-        start_tls
-        
-        if (requires_authentication?)
-          enter_sent_auth_state!
-        else
-          enter_ready_state!
-        end
-      else
-        fail_unanticipated_response!(reply_code, reply_message)
-      end
-    when :sent_auth
-      case (reply_code)
-      when 235
-        enter_ready_state!
-      else
-        fail_unanticipated_response!(reply_code, reply_message)
-      end
-    when :sent_mail_from
-      case (reply_code)
-      when 250
-        @state = :sent_rcpt_to
-        send_line("RCPT TO:#{@active_message[:to]}")
-      else
-        fail_unanticipated_response!(reply_code, reply_message)
-      end
-    when :sent_rcpt_to
-      case (reply_code)
-      when 250
-        @state = :sent_data
-        send_line("DATA")
-        
-        @data_offset = 0
-      else
-        fail_unanticipated_response!(reply_code, reply_message)
-      end
-    when :sent_data
-      case (reply_code)
-      when 354
-        @state = :data_sending
-        
-        transmit_data!
-      else
-        fail_unanticipated_response!(reply_code, reply_message)
-      end
-    when :sent_data_content
-      send_callback(reply_code, reply_message)
-      
-      enter_ready_state!
-    when :sent_quit
-      case (reply_code)
-      when 221
-        @state = :closed
-        close_connection
-      else
-        fail_unanticipated_response!(reply_code, reply_message)
-      end
-    when :sent_reset
-      case (reply_code)
-      when 250
-        enter_ready_state!
-      end
-    end
+    @state.receive_reply(reply_code, reply_message)
   end
   
   def enter_proxy_init_state!
@@ -509,11 +394,6 @@ protected
     @state = :ready
     
     send_queued_message!
-  end
-  
-  def enter_sent_auth_state!
-    send_line("AUTH PLAIN #{self.class.encode_authentication(@options[:username], @options[:password])}")
-    @state = :sent_auth
   end
   
   def transmit_data!(chunk_size = nil)
