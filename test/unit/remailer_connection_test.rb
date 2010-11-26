@@ -4,7 +4,7 @@ class RemailerConnectionTest < Test::Unit::TestCase
   def test_split_reply
     assert_mapping(
       '250 OK' => [ 250, 'OK', false ],
-      '250 OK' => [ 250, 'OK', false ],
+      '250 Long message' => [ 250, 'Long message', false ],
       'OK' => nil,
       '100-Example' => [ 100, 'Example', true ]
     ) do |reply|
