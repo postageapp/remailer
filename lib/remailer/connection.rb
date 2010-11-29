@@ -8,7 +8,7 @@ class Remailer::Connection < EventMachine::Connection
 
   # == Submodules ===========================================================
   
-  autoload(:State, 'remailer/connection/state')
+  autoload(:SmtpInterpreter, 'remailer/connection/smtp_interpreter')
 
   # == Constants ============================================================
   

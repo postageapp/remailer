@@ -8,7 +8,7 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
 
   # == Configuration ========================================================
   
-  state :connected do
+  state :initialized do
     interpret(220) do |message|
       message_parts = message.split(/\s+/)
       @remote = message_parts.first
@@ -43,7 +43,7 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
 
       case (message_parts[0].to_s.upcase)
       when 'SIZE'
-        @max_size = reply_parts[1].to_i
+        @max_size = message_parts[1].to_i
       when 'PIPELINING'
         @pipelining = true
       when 'STARTTLS'
@@ -51,7 +51,7 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
       end
 
       unless (continues)
-        if (delegate.use_tls?)
+        if (delegate.use_tls? and @tls_support)
           enter_state(:starttls)
         elsif (delegate.requires_authentication?)
           enter_state(:auth)
@@ -71,9 +71,9 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
       delegate.start_tls
       
       if (delegate.requires_authentication?)
-        enter_sent_auth_state!
+        enter_state(:auth)
       else
-        enter_ready_state!
+        enter_state(:ready)
       end
     end
   end
@@ -135,6 +135,7 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
   
   state :quit do
     enter do
+      delegate.send_line("QUIT")
     end
     
     interpret(221) do

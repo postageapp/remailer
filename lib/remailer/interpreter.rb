@@ -7,6 +7,7 @@ class Remailer::Interpreter
   
   # == Properties ===========================================================
   
+  attr_reader :delegate
   attr_reader :state
   attr_reader :error
 
