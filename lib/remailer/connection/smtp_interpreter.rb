@@ -1,12 +1,45 @@
 class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
   # == Constants ============================================================
 
+  CRLF = "\r\n".freeze
+  CRLF_LENGTH = CRLF.length
+  LINE_REGEXP = /^.*?\r?\n/.freeze
+
   # == Properties ===========================================================
 
   attr_reader :remote, :protocol
   attr_reader :max_size, :pipelining, :tls_support
 
-  # == Configuration ========================================================
+  # == Class Methods ========================================================
+  
+  # Expands a standard SMTP reply into three parts: Numerical code, message
+  # and a boolean indicating if this reply is continued on a subsequent line.
+  def self.split_reply(reply)
+    reply.match(/(\d+)([ \-])(.*)/) and [ $1.to_i, $3, $2 == '-' ]
+  end
+
+  # Encodes the given user authentication paramters as a Base64-encoded
+  # string as defined by RFC4954
+  def self.encode_authentication(username, password)
+    base64("\0#{username}\0#{password}")
+  end
+  
+  # Encodes the given data for an RFC5321-compliant stream where lines with
+  # leading period chracters are escaped.
+  def self.encode_data(data)
+    data.gsub(/((?:\r\n|\n)\.)/m, '\\1.')
+  end
+
+  # Encodes a string in Base64 as a single line
+  def self.base64(string)
+    [ string.to_s ].pack('m').chomp
+  end
+  
+  # == State Mapping ========================================================
+  
+  parse(LINE_REGEXP) do |data|
+    split_reply(data.chomp)
+  end
   
   state :initialized do
     interpret(220) do |message|
@@ -48,6 +81,11 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
         @pipelining = true
       when 'STARTTLS'
         @tls_support = true
+      when 'AUTH'
+        @auth_support = message_parts[1, message_parts.length].inject({ }) do |h, v|
+          h[v] = true
+          h
+        end
       end
 
       unless (continues)
@@ -80,16 +118,40 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
 
   state :auth do
     enter do
-      delegate.send_line("AUTH PLAIN #{delegate.class.encode_authentication(delegate.options[:username], delegate.options[:password])}")
+      delegate.send_line("AUTH PLAIN #{self.class.encode_authentication(delegate.options[:username], delegate.options[:password])}")
     end
     
     interpret(235) do
       enter_state(:ready)
     end
+    
+    interpret(535) do |message, continues|
+      if (@error)
+        @error << ' '
+        
+        if (message.match(/^(\S+)/).to_s == @error.match(/^(\S+)/).to_s)
+          @error << message.sub(/^\S+/, '')
+        else
+          @error << message
+        end
+      else
+        @error = message
+      end
+
+      unless (continues)
+        enter_state(:quit)
+      end
+    end
   end
   
   state :ready do
     # This is a holding state, nothing is expected to happen here
+  end
+  
+  state :send do
+    enter do
+      enter_state(:mail_from)
+    end
   end
   
   state :mail_from do
@@ -124,7 +186,16 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
   
   state :sending do
     enter do
-      delegate.transmit_data!
+      data = delegate.active_message[:data]
+
+      delegate.debug_notification(:send, data.inspect)
+
+      delegate.send_data(self.class.encode_data(data))
+
+      # Ensure that a blank line is sent after the last bit of email content
+      # to ensure that the dot is on its own line.
+      delegate.send_line
+      delegate.send_line(".")
     end
     
     default do |reply_code, reply_message|
@@ -139,7 +210,12 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
     end
     
     interpret(221) do
-      enter_state(:closed)
+      enter_state(:terminated)
+    end
+  end
+  
+  state :terminated do
+    enter do
       delegate.close_connection
     end
   end
@@ -153,9 +229,27 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
       enter_state(:ready)
     end
   end
-
-  # == Class Methods ========================================================
   
+  state :noop do
+    enter do
+      delegate.send_line("NOOP")
+    end
+    
+    interpret(250) do
+      enter_state(:ready)
+    end
+  end
+  
+  on_error do |reply_code, reply_message|
+    delegate.send_callback(reply_code, reply_message)
+    delegate.debug_notification(:error, "[#{@state}] #{reply_code} #{reply_message}")
+    delegate.error_notification(reply_code, reply_message)
+    
+    delegate.active_message = nil
+    
+    enter_state(@protocol ? :reset : :terminated)
+  end
+
   # == Instance Methods =====================================================
 
 end

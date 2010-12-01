@@ -1,41 +1,6 @@
 require File.expand_path(File.join(*%w[ .. helper ]), File.dirname(__FILE__))
 
 class RemailerConnectionTest < Test::Unit::TestCase
-  def test_split_reply
-    assert_mapping(
-      '250 OK' => [ 250, 'OK', false ],
-      '250 Long message' => [ 250, 'Long message', false ],
-      'OK' => nil,
-      '100-Example' => [ 100, 'Example', true ]
-    ) do |reply|
-      Remailer::Connection.split_reply(reply)
-    end
-  end
-
-  def test_encode_data
-    sample_data = "Line 1\r\nLine 2\r\n.\r\nLine 3\r\n.Line 4\r\n"
-    
-    assert_equal "Line 1\r\nLine 2\r\n..\r\nLine 3\r\n..Line 4\r\n", Remailer::Connection.encode_data(sample_data)
-  end
-  
-  def test_base64
-    assert_mapping(
-      'example' => 'example',
-      "\x7F" => "\x7F",
-      nil => ''
-    ) do |example|
-      Remailer::Connection.base64(example).unpack('m')[0]
-    end
-  end
-  
-  def test_encode_authentication
-    assert_mapping(
-      %w[ tester tester ] => 'AHRlc3RlcgB0ZXN0ZXI='
-    ) do |username, password|
-      Remailer::Connection.encode_authentication(username, password)
-    end
-  end
-
   def test_connect
     engine do
       debug = { }

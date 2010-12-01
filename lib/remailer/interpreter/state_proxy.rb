@@ -7,6 +7,10 @@ class Remailer::Interpreter::StateProxy
     instance_eval(&block) if (block_given?)
   end
   
+  def parse(spec = nil, &block)
+    @options[:parser] = Remailer::Interpreter.parser_for_spec(spec, &block)
+  end
+  
   def enter(&block)
     @options[:enter] ||= [ ]
     @options[:enter] << block

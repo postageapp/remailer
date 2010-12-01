@@ -9,46 +9,14 @@ class Remailer::Connection < EventMachine::Connection
   # == Submodules ===========================================================
   
   autoload(:SmtpInterpreter, 'remailer/connection/smtp_interpreter')
+  autoload(:Socks5Interpreter, 'remailer/connection/socks5_interpreter')
 
   # == Constants ============================================================
   
   DEFAULT_TIMEOUT = 5
-  CRLF = "\r\n".freeze
-  CRLF_LENGTH = CRLF.length
 
   SMTP_PORT = 25
   SOCKS5_PORT = 1080
-  
-  SOCKS5_VERSION = 5
-
-  SOCKS5_METHOD = {
-    :no_auth => 0,
-    :gssapi => 1,
-    :username_password => 2
-  }.freeze
-  
-  SOCKS5_COMMAND = {
-    :connect => 1,
-    :bind => 2
-  }.freeze
-  
-  SOCKS5_REPLY = {
-    0 => 'Succeeded',
-    1 => 'General SOCKS server failure',
-    2 => 'Connection not allowed',
-    3 => 'Network unreachable',
-    4 => 'Host unreachable',
-    5 => 'Connection refused',
-    6 => 'TTL expired',
-    7 => 'Command not supported',
-    8 => 'Address type not supported'
-  }.freeze
-  
-  SOCKS5_ADDRESS_TYPE = {
-    :ipv4 => 1,
-    :domainname => 3,
-    :ipv6 => 4
-  }.freeze
   
   NOTIFICATIONS = [
     :debug,
@@ -59,7 +27,7 @@ class Remailer::Connection < EventMachine::Connection
   # == Properties ===========================================================
   
   attr_reader :state, :mode
-  attr_reader :remote, :max_size, :protocol
+  attr_reader :remote, :max_size, :protocol, :hostname
   attr_accessor :timeout
   attr_accessor :options
 
@@ -74,11 +42,24 @@ class Remailer::Connection < EventMachine::Connection
   # * require_tls => If true will fail connections to non-TLS capable
   #   servers (default is false)
   # * use_tls => Will use TLS if availble (default is true)
-  def self.open(smtp_server, options = nil)
+  # * debug => Where to send debugging output (IO or Proc)
+  # * connect => Where to send a connection notification (IO or Proc)
+  # * error => Where to send errors (IO or Proc)
+  # A block can be supplied in which case it will stand in as the :connect
+  # option. The block will recieve a first argument that is the status of
+  # the connection, and an optional second that is a diagnostic message.
+  def self.open(smtp_server, options = nil, &block)
     options ||= { }
     options[:host] = smtp_server
     options[:port] ||= 25
-    options[:use_tls] = true unless (options.key?(:use_tls))
+
+    unless (options.key?(:use_tls))
+      options[:use_tls] = true
+    end
+
+    if (block_given?)
+      options[:connect] = block
+    end
     
     host_name = smtp_server
     host_port = options[:port]
@@ -91,40 +72,31 @@ class Remailer::Connection < EventMachine::Connection
     EventMachine.connect(host_name, host_port, self, options)
   end
   
-  def self.encode_data(data)
-    data.gsub(/((?:\r\n|\n)\.)/m, '\\1.')
+  def self.hostname
+    Socket.gethostname
   end
   
-  def self.base64(string)
-    [ string.to_s ].pack('m').chomp
-  end
-  
-  def self.encode_authentication(username, password)
-    base64("\0#{username}\0#{password}")
-  end
-  
+  # Warns about supplying a Proc which does not appear to accept the required
+  # number of arguments.
   def self.warn_about_arguments(proc, range)
     unless (range.include?(proc.arity) or proc.arity == -1)
       STDERR.puts "Callback must accept #{[ range.min, range.max ].uniq.join(' to ')} arguments but accepts #{proc.arity}"
     end
   end
-  
-  def self.split_reply(reply)
-    reply.match(/(\d+)([ \-])(.*)/) and [ $1.to_i, $3, $2 == '-' ]
-  end
 
   # == Instance Methods =====================================================
   
+  # EventMachine will call this constructor and it is not to be called
+  # directly. Use the Remailer::Connection.open method to facilitate the
+  # correct creation of a new connection.
   def initialize(options)
     # Throwing exceptions inside this block is going to cause EventMachine
     # to malfunction in a spectacular way and hide the actual exception. To
     # allow for debugging, exceptions are dumped to STDERR as a last resort.
     @options = options
+    @options[:hostname] ||= self.class.hostname
 
-    @options[:hostname] ||= Socket.gethostname
     @messages = [ ]
-    
-    @state = Remailer::Connection::State.new
   
     NOTIFICATIONS.each do |type|
       callback = @options[type]
@@ -189,7 +161,7 @@ class Remailer::Connection < EventMachine::Connection
     @messages << message
     
     # If the connection is ready to send...
-    if (@state == :ready)
+    if (@interpreter and @interpreter.state == :ready)
       # ...send the message right away.
       send_queued_message!
     end
@@ -214,10 +186,13 @@ class Remailer::Connection < EventMachine::Connection
     @timeout_at = nil
     
     if (using_proxy?)
-      enter_proxy_init_state!
+      @mode = :socks5
+      @interpreter = Remailer::Connection::Socks5Interpreter.new(:delegate => self)
     else
+      @mode = :smtp
+      @interpreter = Remailer::Connection::SmtpInterpreter.new(:delegate => self)
+
       connect_notification(true, "Connection completed")
-      @state = :connected
       @connected = true
     end
   end
@@ -225,7 +200,7 @@ class Remailer::Connection < EventMachine::Connection
   # This implements the EventMachine::Connection#unbind method to capture
   # a connection closed event.
   def unbind
-    @state = :closed
+    @mode = :closed
     
     if (@active_message)
       if (callback = @active_message[:callback])
@@ -234,49 +209,16 @@ class Remailer::Connection < EventMachine::Connection
     end
   end
 
+  # This implements the EventMachine::Connection#receive_data method that
+  # is called each time new data is received from the socket.
   def receive_data(data)
-    # FIX: Buffer the data anyway.
-    
-    case (state)
-    when :proxy_init
-      version, method = data.unpack('CC')
-      
-      if (method == SOCKS5_METHOD[:username_password])
-        enter_proxy_authentication_state!
-      else
-        enter_proxy_connecting_state!
-      end
-    when :proxy_connecting
-      version, reply, reserved, address_type, address, port = data.unpack('CCCCNn')
-      
-      case (reply)
-      when 0
-        @state = :connected
-        @connected = true
-        connect_notification(true, "Connection completed")
-      else
-        debug(:error, "Proxy server returned error code #{reply}: #{SOCKS5_REPLY[reply]}")
-        connect_notification(false, "Proxy server returned error code #{reply}: #{SOCKS5_REPLY[reply]}")
-        close_connection
-        @state = :failed
-      end
-    when :proxy_authenticating
-      # Decode response of authentication request...
-      
-      # ...
-    else
-      # Data is received in arbitrary sized chunks, so there is no guarantee
-      # a whole line will be ready to process, or that there is only one line.
-      @buffer ||= ''
-      @buffer << data
-    
-      while (line_index = @buffer.index(CRLF))
-        if (line_index > 0)
-          receive_reply(@buffer[0, line_index])
-        end
+    @buffer ||= ''
+    @buffer << data
 
-        @buffer = (@buffer[line_index + CRLF_LENGTH, @buffer.length] || '')
-      end
+    if (@interpreter)
+      @interpreter.process(@buffer)
+    else
+      # Some kind of invalid mode
     end
   end
 
@@ -313,108 +255,13 @@ protected
     nil
   end
 
-  def receive_reply(reply)
-    debug_notification(:reply, reply.inspect)
+#    debug_notification(:reply, reply.inspect)
 
-    return unless (reply)
-    
-    reply_code, reply_message, @reply_continued = self.class.split_reply(reply)
-    
-    @state.receive_reply(reply_code, reply_message)
-  end
-  
-  def enter_proxy_init_state!
-    debug_notification(:proxy, "Initiating proxy connection through #{@options[:proxy][:host]}")
-
-    socks_methods = [ ]
-    
-    if (@options[:proxy][:username])
-      socks_methods << SOCKS5_METHOD[:username_password]
-    end
-    
-    send_data(
-      [
-        SOCKS5_VERSION,
-        socks_methods.length,
-        socks_methods
-      ].flatten.pack('CCC*')
-    )
-
-    @state = :proxy_init
-  end
-  
-  def enter_proxy_connecting_state!
-    # REFACTOR: Move the resolution of the hostname to an earlier point to
-    #           avoid connecting needlessly.
-    
-    debug_notification(:proxy, "Sending proxy connection request to #{@options[:host]}:#{@options[:port]}")
-    
-    if (ip_address = resolve_hostname(@options[:host]))
-      send_data(
-        [
-          SOCKS5_VERSION,
-          SOCKS5_COMMAND[:connect],
-          0,
-          SOCKS5_ADDRESS_TYPE[:ipv4],
-          ip_address,
-          @options[:port]
-        ].pack('CCCCA4n')
-      )
-      
-      @state = :proxy_connecting
-    else
-      send_callback(:error_connecting, "Could not resolve hostname #{@options[:host]}")
-      
-      @state = :failed
-      close_connection
-    end
-  end
-  
-  def enter_proxy_authenticating_state!
-    debug_notification(:proxy, "Sending proxy authentication")
-
-    proxy_options = @options[:proxy]
-    username = proxy_options[:username]
-    password = proxy_options[:password]
-    
-    send_data(
-      [
-        SOCKS5_VERSION,
-        username.length,
-        username,
-        password.length,
-        password
-      ].pack('CCA*CA*')
-    )
-    
-    @state = :proxy_authenticating
-  end
-  
   def enter_ready_state!
-    @state = :ready
-    
     send_queued_message!
   end
   
   def transmit_data!(chunk_size = nil)
-    data = @active_message[:data]
-    chunk_size ||= data.length
-    
-    # This chunk-based sending will work better when/if EventMachine can be
-    # configured to support 'writable' notifications on the active socket.
-    chunk = data[@data_offset, chunk_size]
-    debug_notification(:send, chunk.inspect)
-    send_data(self.class.encode_data(data))
-    @data_offset += chunk_size
-    
-    if (@data_offset >= data.length)
-      @state = :sent_data_content
-
-      # Ensure that a blank line is sent after the last bit of email content
-      # to ensure that the dot is on its own line.
-      send_line
-      send_line(".")
-    end
   end
   
   def reset_timeout!
@@ -427,15 +274,13 @@ protected
     reset_timeout!
       
     if (@active_message = @messages.shift)
-      @state = :sent_mail_from
-      send_line("MAIL FROM:#{@active_message[:from]}")
+      @interpreter.enter_state(:send_email)
     elsif (@options[:close])
       if (callback = @options[:after_complete])
         callback.call
       end
-
-      send_line("QUIT")
-      @state = :sent_quit
+      
+      @interpreter.enter_state(:quit)
     end
   end
 
@@ -446,7 +291,7 @@ protected
     debug_notification(:timeout, "Connection timed out")
     send_callback(:timeout, "Connection timed out before send could complete")
 
-    @state = :timeout
+    @interpreter.enter_state(:quit)
 
     unless (@connected)
       connect_notification(false, "Connection timed out")
@@ -491,16 +336,5 @@ protected
         callback.call(reply_code)
       end
     end
-  end
-  
-  def fail_unanticipated_response!(reply_code, reply_message)
-    send_callback(reply_code, reply_message)
-    debug_notification(:error, "[#{@state}] #{reply_code} #{reply_message}")
-    error_notification(reply_code, reply_message)
-    
-    @active_message = nil
-    
-    @state = :sent_reset
-    send_line("RESET")
   end
 end
