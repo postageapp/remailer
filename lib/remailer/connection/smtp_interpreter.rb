@@ -57,7 +57,7 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
     end
 
     interpret(250) do
-      enter_state(:ready)
+      enter_state(:established)
     end
   end
   
@@ -89,7 +89,7 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
         elsif (delegate.requires_authentication?)
           enter_state(:auth)
         else
-          enter_state(:ready)
+          enter_state(:established)
         end
       end
     end
@@ -106,7 +106,7 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
       if (delegate.requires_authentication?)
         enter_state(:auth)
       else
-        enter_state(:ready)
+        enter_state(:established)
       end
     end
   end
@@ -117,7 +117,7 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
     end
     
     interpret(235) do
-      enter_state(:ready)
+      enter_state(:established)
     end
     
     interpret(535) do |message, continues|
@@ -139,11 +139,17 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
     end
   end
   
+  state :established do
+    enter do
+      delegate.connect_notification(true)
+      
+      enter_state(:ready)
+    end
+  end
+  
   state :ready do
     enter do
-      delegate.connect_notification(true, delegate.remote)
-      
-      delegate.send_queued_message!
+      delegate.after_ready
     end
   end
   
@@ -198,7 +204,14 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
     end
     
     default do |reply_code, reply_message|
-      delegate.send_callback(reply_code, reply_message)
+      delegate_call(:after_message_sent, reply_code, reply_message)
+
+      enter_state(:sent)
+    end
+  end
+  
+  state :sent do
+    enter do
       enter_state(:ready)
     end
   end
@@ -246,7 +259,7 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
     
     delegate.active_message = nil
     
-    enter_state(@protocol ? :reset : :terminated)
+    enter_state(delegate.protocol ? :reset : :terminated)
   end
 
   # == Instance Methods =====================================================

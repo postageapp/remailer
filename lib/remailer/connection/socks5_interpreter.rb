@@ -155,13 +155,13 @@ class Remailer::Connection::Socks5Interpreter < Remailer::Interpreter
     end
     
     interpret(0) do
-      
+      enter_state(:connected)
     end
   end
   
   state :connected do
     enter do
-      delegate.connect_notification(true, "Connection completed")
+      delegate_call(:after_proxy_connected)
     end
   end
   

@@ -102,7 +102,7 @@ class Remailer::Interpreter
   
   # Returns the currently defined parser.
   def self.default_parser
-    @parser ||= lambda { |s| s }
+    @parser ||= lambda { |s| _s = s.dup; s.replace(''); _s }
   end
   
   # Returns the current default_interpreter.
@@ -138,10 +138,10 @@ class Remailer::Interpreter
     end
     
     @state = state
+
+    delegate_call(:interpreter_entered_state, self, @state)
     
     trigger_callbacks(state, :enter)
-    
-    delegate_call(:interpreter_entered_state, @state)
     
     # :terminated is the state, :terminate is the trigger.
     if (@state != :terminated)

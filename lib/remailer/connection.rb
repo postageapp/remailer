@@ -70,7 +70,13 @@ class Remailer::Connection < EventMachine::Connection
       host_port = proxy_options[:port] || SOCKS5_PORT
     end
 
-    EventMachine.connect(host_name, host_port, self, options)
+    begin
+      EventMachine.connect(host_name, host_port, self, options)
+    rescue EventMachine::ConnectionError => e
+       options[:connect].is_a?(Proc) and options[:connect].call(false, e.to_s)
+       options[:debug].is_a?(Proc) and options[:debug].call(:error, e.to_s)
+       options[:error].is_a?(Proc) and options[:error].call(:connect_error, e.to_s)
+    end
   end
   
   # Warns about supplying a Proc which does not appear to accept the required
@@ -108,11 +114,11 @@ class Remailer::Connection < EventMachine::Connection
     reset_timeout!
 
     if (using_proxy?)
-      @interpreter = Remailer::Connection::Socks5Interpreter.new(:delegate => self)
+      use_socks5_interpreter!
     else
-      @interpreter = Remailer::Connection::SmtpInterpreter.new(:delegate => self)
+      use_smtp_interpreter!
     end
-
+    
   rescue Object => e
     STDERR.puts "#{e.class}: #{e}"
   end
@@ -171,7 +177,7 @@ class Remailer::Connection < EventMachine::Connection
     # If the connection is ready to send...
     if (@interpreter and @interpreter.state == :ready)
       # ...send the message right away.
-      send_queued_message!
+      after_ready
     end
   end
   
@@ -209,6 +215,8 @@ class Remailer::Connection < EventMachine::Connection
   # This implements the EventMachine::Connection#receive_data method that
   # is called each time new data is received from the socket.
   def receive_data(data)
+    reset_timeout!
+
     @buffer ||= ''
     @buffer << data
 
@@ -232,6 +240,8 @@ class Remailer::Connection < EventMachine::Connection
   end
 
   def send_line(line = '')
+    reset_timeout!
+
     send_data(line + CRLF)
 
     debug_notification(:send, line.inspect)
@@ -242,7 +252,8 @@ class Remailer::Connection < EventMachine::Connection
     #        resolver if available.
     record = Socket.gethostbyname(hostname)
     
-    debug_notification(:resolved, record && record.last)
+    # FIXME: IPv6 Support here
+    debug_notification(:resolved, record && record.last.unpack('CCCC').join('.'))
 
     record and record.last
   rescue
@@ -252,25 +263,7 @@ class Remailer::Connection < EventMachine::Connection
   def reset_timeout!
     @timeout_at = Time.now + (@options[:timeout] || DEFAULT_TIMEOUT)
   end
-
-  def send_queued_message!
-    return if (@active_message)
-    
-    reset_timeout!
-      
-    if (@active_message = @messages.shift)
-      if (@interpreter.state == :ready)
-        @interpreter.enter_state(:send)
-      end
-    elsif (@options[:close])
-      if (callback = @options[:after_complete])
-        callback.call
-      end
-      
-      @interpreter.enter_state(:quit)
-    end
-  end
-
+  
   def check_for_timeouts!
     return if (!@timeout_at or Time.now < @timeout_at)
 
@@ -297,9 +290,55 @@ class Remailer::Connection < EventMachine::Connection
     !!@closed
   end
   
+  def start_tls
+    debug_notification(:tls, "Started")
+    super
+  end
+  
   def close_connection
+    debug_notification(:closed, "Connection closed")
     super
     @closed = true
+  end
+
+  def use_socks5_interpreter!
+    @interpreter = Remailer::Connection::Socks5Interpreter.new(:delegate => self)
+  end
+
+  def use_smtp_interpreter!
+    @interpreter = Remailer::Connection::SmtpInterpreter.new(:delegate => self)
+  end
+
+  def after_proxy_connected
+    use_smtp_interpreter!
+  end
+
+  def after_ready
+    return if (@active_message)
+    
+    reset_timeout!
+    
+    if (@active_message = @messages.shift)
+      if (@interpreter.state == :ready)
+        @interpreter.enter_state(:send)
+      end
+    elsif (@options[:close])
+      if (callback = @options[:after_complete])
+        callback.call
+      end
+      
+      @interpreter.enter_state(:quit)
+    end
+  end
+
+  def after_message_sent(reply_code, reply_message)
+    send_callback(reply_code, reply_message)
+
+    @active_message = nil
+  end
+  
+  def interpreter_entered_state(interpreter, state)
+    debug_notification(:state, "#{interpreter.label.downcase}=#{state}")
   end
 
   def send_notification(type, code, message)
@@ -315,8 +354,8 @@ class Remailer::Connection < EventMachine::Connection
     end
   end
   
-  def connect_notification(code, message)
-    send_notification(:connect, code, message)
+  def connect_notification(code, message = nil)
+    send_notification(:connect, code, message || self.remote)
   end
 
   def error_notification(code, message)

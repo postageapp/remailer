@@ -59,10 +59,10 @@ end
 class RemailerConnectionSmtpInterpreterTest < Test::Unit::TestCase
   def test_split_reply
     assert_mapping(
-      '250 OK' => [ 250, 'OK', false ],
-      '250 Long message' => [ 250, 'Long message', false ],
+      '250 OK' => [ 250, 'OK' ],
+      '250 Long message' => [ 250, 'Long message' ],
       'OK' => nil,
-      '100-Example' => [ 100, 'Example', true ]
+      '100-Example' => [ 100, 'Example', :continued ]
     ) do |reply|
       Remailer::Connection::SmtpInterpreter.split_reply(reply)
     end
@@ -72,10 +72,10 @@ class RemailerConnectionSmtpInterpreterTest < Test::Unit::TestCase
     interpreter = Remailer::Connection::SmtpInterpreter.new
     
     assert_mapping(
-      "250 OK\r\n" => [ 250, 'OK', false ],
-      "250 Long message\r\n" => [ 250, 'Long message', false ],
+      "250 OK\r\n" => [ 250, 'OK' ],
+      "250 Long message\r\n" => [ 250, 'Long message' ],
       "OK\r\n" => nil,
-      "100-Example\r\n" => [ 100, 'Example', true ],
+      "100-Example\r\n" => [ 100, 'Example', :continued ],
       "100-Example" => nil
     ) do |reply|
       interpreter.parse(reply.dup)

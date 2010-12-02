@@ -57,8 +57,12 @@ class Test::Unit::TestCase
     ThreadsWait.all_waits(
       Thread.new do
         Thread.abort_on_exception = true
+
         # Create a thread for the engine to run on
-        EventMachine.run
+        begin
+          EventMachine.run
+        rescue Object => exception
+        end
       end,
       Thread.new do
         # Execute the test code in a separate thread to avoid blocking
@@ -67,7 +71,12 @@ class Test::Unit::TestCase
           yield
         rescue Object => exception
         ensure
-          EventMachine.stop_event_loop
+          begin
+            EventMachine.stop_event_loop
+          rescue Object
+            # Shutting down may trigger an exception from time to time
+            # if the engine itself has failed.
+          end
         end
       end
     )

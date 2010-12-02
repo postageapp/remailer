@@ -23,7 +23,7 @@ class RemailerConnectionTest < Test::Unit::TestCase
       assert !connection.error?
       assert !connection.closed?
 
-      assert_eventually(15) do
+      assert_eventually(30) do
         connection.closed?
       end
 
@@ -37,7 +37,7 @@ class RemailerConnectionTest < Test::Unit::TestCase
     end
   end
 
-  def test_failed_connect
+  def test_failed_connect_no_service
     engine do
       error_received = nil
 
@@ -55,6 +55,27 @@ class RemailerConnectionTest < Test::Unit::TestCase
       end
 
       assert_equal :timeout, error_received[0]
+    end
+  end
+
+  def test_failed_connect_no_valid_hostname
+    engine do
+      error_received = nil
+
+      connection = Remailer::Connection.open(
+        'invalid-example-domain--x.com',
+        :debug => STDERR,
+        :error => lambda { |code, message|
+          error_received = [ code, message ]
+        },
+        :timeout => 1
+      )
+
+      assert_eventually(3) do
+        error_received
+      end
+
+      assert_equal :connect_error, error_received[0]
     end
   end
 
@@ -81,7 +102,7 @@ class RemailerConnectionTest < Test::Unit::TestCase
       assert !connection.error?
 
       assert_eventually(15) do
-        connection.state == :closed
+        connection.closed?
       end
 
       assert_equal TestConfig.public_smtp_server[:identifier], connection.remote
@@ -114,11 +135,11 @@ class RemailerConnectionTest < Test::Unit::TestCase
         after_complete_trigger = true
       end
 
-      assert_equal :connecting, connection.state
+      assert_equal :connect_to_proxy, connection.state
       assert !connection.error?
 
       assert_eventually(15) do
-        connection.state == :closed
+        connection.closed?
       end
 
       assert_equal TestConfig.smtp_server[:identifier], connection.remote
@@ -138,24 +159,29 @@ class RemailerConnectionTest < Test::Unit::TestCase
         :debug => STDERR
       )
 
-      assert_equal :connecting, connection.state
+      assert_equal :initialized, connection.state
 
       assert_eventually(10) do
         connection.state == :ready
       end
 
       result_code = nil
+      callback_received = false
+      
       connection.send_email(
         'remailer+test@example.postageapp.com',
         'remailer+test@example.postageapp.com',
         example_message
       ) do |c|
+        callback_received = true
         result_code = c
       end
 
       assert_eventually(5) do
-        result_code == 250
+        callback_received
       end
+      
+      assert_equal 250, result_code
     end
   end
 
@@ -166,7 +192,7 @@ class RemailerConnectionTest < Test::Unit::TestCase
         :debug => STDERR
       )
 
-      assert_equal :connecting, connection.state
+      assert_equal :initialized, connection.state
       assert !connection.error?
 
       result_code = nil
@@ -184,11 +210,39 @@ class RemailerConnectionTest < Test::Unit::TestCase
     end
   end
 
+  def test_connect_and_send_multiple
+    engine do
+      connection = Remailer::Connection.open(
+        TestConfig.smtp_server[:host],
+        :debug => STDERR
+      )
+
+      assert_equal :initialized, connection.state
+      assert !connection.error?
+
+      result_code = [ ]
+
+      10.times do |n|
+        connection.send_email(
+          'remailer+from@example.postageapp.com',
+          "remailer+to#{n}@example.postageapp.com",
+          example_message
+        ) do |c|
+          result_code[n] = c
+        end
+      end
+
+      assert_eventually(15) do
+        result_code == [ 250 ] * 10
+      end
+    end
+  end
+
   def test_connect_and_long_send
     engine do
       connection = Remailer::Connection.open(TestConfig.smtp_server[:host])
 
-      assert_equal :connecting, connection.state
+      assert_equal :initialized, connection.state
 
       result_code = nil
       connection.send_email(
