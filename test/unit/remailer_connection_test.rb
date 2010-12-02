@@ -240,22 +240,30 @@ class RemailerConnectionTest < Test::Unit::TestCase
 
   def test_connect_and_long_send
     engine do
-      connection = Remailer::Connection.open(TestConfig.smtp_server[:host])
+      connection = Remailer::Connection.open(
+        TestConfig.smtp_server[:host],
+        :debug => STDERR
+      )
 
       assert_equal :initialized, connection.state
 
+      callback_made = false
       result_code = nil
+
       connection.send_email(
         TestConfig.sender,
-        TestConfig.receiver,
+        TestConfig.recipient,
         example_message + 'a' * 100000
       ) do |c|
+        callback_made = true
         result_code = c
       end
 
-      assert_eventually(15) do
-        result_code == 250
+      assert_eventually(30) do
+        callback_made
       end
+      
+      assert_equal 250, result_code
     end
   end
 
