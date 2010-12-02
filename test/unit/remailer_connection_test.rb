@@ -4,10 +4,12 @@ class RemailerConnectionTest < Test::Unit::TestCase
   def test_connect
     engine do
       debug = { }
+      connected_host = nil
 
       connection = Remailer::Connection.open(
         TestConfig.smtp_server[:host],
-        :debug => STDERR
+        :debug => STDERR, 
+        :connect => lambda { |success, host| connected_host = host }
       )
 
       after_complete_trigger = false
@@ -17,14 +19,15 @@ class RemailerConnectionTest < Test::Unit::TestCase
         after_complete_trigger = true
       end
 
-      assert_equal :connecting, connection.state
+      assert_equal :initialized, connection.state
       assert !connection.error?
+      assert !connection.closed?
 
       assert_eventually(15) do
-        connection.state == :closed
+        connection.closed?
       end
 
-      assert_equal TestConfig.smtp_server[:host], connection.remote
+      assert_equal TestConfig.smtp_server[:host], connected_host
 
       assert_equal true, after_complete_trigger
 
@@ -74,7 +77,7 @@ class RemailerConnectionTest < Test::Unit::TestCase
         after_complete_trigger = true
       end
 
-      assert_equal :connecting, connection.state
+      assert_equal :initialized, connection.state
       assert !connection.error?
 
       assert_eventually(15) do

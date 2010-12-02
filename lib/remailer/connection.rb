@@ -13,6 +13,7 @@ class Remailer::Connection < EventMachine::Connection
 
   # == Constants ============================================================
   
+  CRLF = "\r\n".freeze
   DEFAULT_TIMEOUT = 5
 
   SMTP_PORT = 25
@@ -26,8 +27,8 @@ class Remailer::Connection < EventMachine::Connection
   
   # == Properties ===========================================================
   
-  attr_reader :state, :mode
-  attr_reader :remote, :max_size, :protocol, :hostname
+  attr_accessor :remote, :max_size, :protocol, :hostname
+  attr_accessor :pipelining, :tls_support
   attr_accessor :timeout
   attr_accessor :options
 
@@ -72,10 +73,6 @@ class Remailer::Connection < EventMachine::Connection
     EventMachine.connect(host_name, host_port, self, options)
   end
   
-  def self.hostname
-    Socket.gethostname
-  end
-  
   # Warns about supplying a Proc which does not appear to accept the required
   # number of arguments.
   def self.warn_about_arguments(proc, range)
@@ -94,7 +91,7 @@ class Remailer::Connection < EventMachine::Connection
     # to malfunction in a spectacular way and hide the actual exception. To
     # allow for debugging, exceptions are dumped to STDERR as a last resort.
     @options = options
-    @options[:hostname] ||= self.class.hostname
+    @hostname = @options[:hostname] || Socket.gethostname
 
     @messages = [ ]
   
@@ -109,8 +106,19 @@ class Remailer::Connection < EventMachine::Connection
     debug_notification(:options, @options.inspect)
   
     reset_timeout!
+
+    if (using_proxy?)
+      @interpreter = Remailer::Connection::Socks5Interpreter.new(:delegate => self)
+    else
+      @interpreter = Remailer::Connection::SmtpInterpreter.new(:delegate => self)
+    end
+
   rescue Object => e
     STDERR.puts "#{e.class}: #{e}"
+  end
+  
+  def use_tls?
+    !!@options[:use_tls]
   end
   
   # Returns true if the connection has advertised TLS support, or false if
@@ -184,23 +192,12 @@ class Remailer::Connection < EventMachine::Connection
   # flagging the connection as estasblished.
   def connection_completed
     @timeout_at = nil
-    
-    if (using_proxy?)
-      @mode = :socks5
-      @interpreter = Remailer::Connection::Socks5Interpreter.new(:delegate => self)
-    else
-      @mode = :smtp
-      @interpreter = Remailer::Connection::SmtpInterpreter.new(:delegate => self)
-
-      connect_notification(true, "Connection completed")
-      @connected = true
-    end
   end
   
   # This implements the EventMachine::Connection#unbind method to capture
   # a connection closed event.
   def unbind
-    @mode = :closed
+    @interpreter = nil
     
     if (@active_message)
       if (callback = @active_message[:callback])
@@ -216,33 +213,30 @@ class Remailer::Connection < EventMachine::Connection
     @buffer << data
 
     if (@interpreter)
-      @interpreter.process(@buffer)
+      @interpreter.process(@buffer) do |reply|
+        debug_notification(:receive, "[#{@interpreter.label}] #{reply.inspect}")
+      end
     else
-      # Some kind of invalid mode
+      error_notification(:out_of_band, "Receiving data before a protocol has been established.")
     end
   end
 
   def post_init
-    @state = :connecting
-  
     EventMachine.add_periodic_timer(1) do
       check_for_timeouts!
     end
   end
+  
+  def state
+    @interpreter and @interpreter.state
+  end
 
-protected
   def send_line(line = '')
     send_data(line + CRLF)
 
     debug_notification(:send, line.inspect)
   end
 
-  # Returns true if the reply has been completed, or false if it is still
-  # in the process of being received.
-  def reply_complete?
-    !!@reply_complete
-  end
-  
   def resolve_hostname(hostname)
     # FIXME: Elminitate this potentially blocking call by using an async
     #        resolver if available.
@@ -255,15 +249,6 @@ protected
     nil
   end
 
-#    debug_notification(:reply, reply.inspect)
-
-  def enter_ready_state!
-    send_queued_message!
-  end
-  
-  def transmit_data!(chunk_size = nil)
-  end
-  
   def reset_timeout!
     @timeout_at = Time.now + (@options[:timeout] || DEFAULT_TIMEOUT)
   end
@@ -274,7 +259,9 @@ protected
     reset_timeout!
       
     if (@active_message = @messages.shift)
-      @interpreter.enter_state(:send_email)
+      if (@interpreter.state == :ready)
+        @interpreter.enter_state(:send)
+      end
     elsif (@options[:close])
       if (callback = @options[:after_complete])
         callback.call
@@ -291,8 +278,6 @@ protected
     debug_notification(:timeout, "Connection timed out")
     send_callback(:timeout, "Connection timed out before send could complete")
 
-    @interpreter.enter_state(:quit)
-
     unless (@connected)
       connect_notification(false, "Connection timed out")
     end
@@ -300,6 +285,23 @@ protected
     close_connection
   end
   
+  def pipelining?
+    !!@pipelining
+  end
+
+  def tls_support?
+    !!@tls_support
+  end
+  
+  def closed?
+    !!@closed
+  end
+  
+  def close_connection
+    super
+    @closed = true
+  end
+
   def send_notification(type, code, message)
     case (callback = @options[type])
     when nil, false

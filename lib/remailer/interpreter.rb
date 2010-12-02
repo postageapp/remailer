@@ -89,24 +89,28 @@ class Remailer::Interpreter
     @parser = parser_for_spec(spec, &block)
   end
   
-  # Returns the currently defined parser. Should not need to be def called
-  # directly.
-  def self.parser
-    @parser ||= lambda { |s| s }
-  end
-  
+  # Assigns the default interpreter.
   def self.default(&block)
     @default = block if (block_given?)
   end
 
-  def self.default_interpreter
-    @default
-  end
-  
+  # Assigns the error handler for when a specific interpretation could not be
+  # found and a default was not specified.
   def self.on_error(&block)
     @on_error = block
   end
   
+  # Returns the currently defined parser.
+  def self.default_parser
+    @parser ||= lambda { |s| s }
+  end
+  
+  # Returns the current default_interpreter.
+  def self.default_interpreter
+    @default
+  end
+  
+  # Returns the defined error handler
   def self.on_error_handler
     @on_error
   end
@@ -137,32 +141,42 @@ class Remailer::Interpreter
     
     trigger_callbacks(state, :enter)
     
+    delegate_call(:interpreter_entered_state, @state)
+    
+    # :terminated is the state, :terminate is the trigger.
     if (@state != :terminated)
-      if (trigger_callbacks(state, :terminated))
+      if (trigger_callbacks(state, :terminate))
         enter_state(:terminated)
       end
     end
   end
   
-  # Parses a given string into interpretable tokens.
+  # Parses a given string and returns the first interpretable token, if any,
+  # or nil otherwise. The string is not modified.
   def parse(s)
     instance_exec(s, &parser)
   end
   
-  # Returns the parser defined for the current state, or the default parser
-  # if one is defined.
+  # Returns the parser defined for the current state, or the default parser.
+  # The default parser simply accepts everything but this can be re-defined
+  # using the class-level parse method.
   def parser
     config = self.class.states[@state]
     
-    config and config[:parser] or self.class.parser
+    config and config[:parser] or self.class.default_parser
   end
 
-  # The input string is
-  # expected to have the parsed component removed.
+  # Processes a given input string into interpretable tokens, processes these
+  # tokens, and removes them from the input string. If no interpretable
+  # tokens could be found, returns immediately. An optional block can be
+  # given that will be called as each interpretable token is discovered with
+  # the token provided as the argument.
   def process(s)
     _parser = parser
 
     while (parsed = s.empty? ? false : instance_exec(s, &_parser))
+      yield(parsed) if (block_given?)
+
       interpret(*parsed)
     end
   end
@@ -233,5 +247,7 @@ protected
     callbacks.compact.each do |proc|
       instance_exec(*args, &proc)
     end
+    
+    true
   end
 end

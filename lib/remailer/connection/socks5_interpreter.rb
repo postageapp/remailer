@@ -179,4 +179,8 @@ class Remailer::Connection::Socks5Interpreter < Remailer::Interpreter
   # == Class Methods ========================================================
 
   # == Instance Methods =====================================================
+  
+  def label
+    'SOCKS5'
+  end
 end

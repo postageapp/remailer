@@ -118,8 +118,8 @@ class RemailerInterpreterTest < Test::Unit::TestCase
     
     interpreter.interpret(:stop, 'Stop message')
 
-    assert_equal :terminated, interpreter.state
     assert_equal 'Stop message', interpreter.message
+    assert_equal :terminated, interpreter.state
   end
 
   def test_default_handler_for_interpreter

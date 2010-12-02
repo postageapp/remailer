@@ -1,21 +1,16 @@
 class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
   # == Constants ============================================================
 
-  CRLF = "\r\n".freeze
-  CRLF_LENGTH = CRLF.length
   LINE_REGEXP = /^.*?\r?\n/.freeze
 
   # == Properties ===========================================================
-
-  attr_reader :remote, :protocol
-  attr_reader :max_size, :pipelining, :tls_support
 
   # == Class Methods ========================================================
   
   # Expands a standard SMTP reply into three parts: Numerical code, message
   # and a boolean indicating if this reply is continued on a subsequent line.
   def self.split_reply(reply)
-    reply.match(/(\d+)([ \-])(.*)/) and [ $1.to_i, $3, $2 == '-' ]
+    reply.match(/(\d+)([ \-])(.*)/) and [ $1.to_i, $3, $2 == '-' ? :continued : nil ].compact
   end
 
   # Encodes the given user authentication paramters as a Base64-encoded
@@ -44,13 +39,13 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
   state :initialized do
     interpret(220) do |message|
       message_parts = message.split(/\s+/)
-      @remote = message_parts.first
-    
+      delegate.remote = message_parts.first
+      
       if (message_parts.include?('ESMTP'))
-        @protocol = :esmtp
+        delegate.protocol = :esmtp
         enter_state(:ehlo)
       else
-        @protocol = :smtp
+        delegate.protocol = :smtp
         enter_state(:helo)
       end
     end
@@ -76,20 +71,20 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
 
       case (message_parts[0].to_s.upcase)
       when 'SIZE'
-        @max_size = message_parts[1].to_i
+        delegate.max_size = message_parts[1].to_i
       when 'PIPELINING'
-        @pipelining = true
+        delegate.pipelining = true
       when 'STARTTLS'
-        @tls_support = true
+        delegate.tls_support = true
       when 'AUTH'
-        @auth_support = message_parts[1, message_parts.length].inject({ }) do |h, v|
+        delegate.auth_support = message_parts[1, message_parts.length].inject({ }) do |h, v|
           h[v] = true
           h
         end
       end
 
       unless (continues)
-        if (delegate.use_tls? and @tls_support)
+        if (delegate.use_tls? and delegate.tls_support?)
           enter_state(:starttls)
         elsif (delegate.requires_authentication?)
           enter_state(:auth)
@@ -145,7 +140,11 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
   end
   
   state :ready do
-    # This is a holding state, nothing is expected to happen here
+    enter do
+      delegate.connect_notification(true, delegate.remote)
+      
+      delegate.send_queued_message!
+    end
   end
   
   state :send do
@@ -252,4 +251,7 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
 
   # == Instance Methods =====================================================
 
+  def label
+    'SMTP'
+  end
 end
