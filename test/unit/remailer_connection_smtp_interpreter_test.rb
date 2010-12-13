@@ -2,6 +2,7 @@ require File.expand_path(File.join(*%w[ .. helper ]), File.dirname(__FILE__))
 
 class SmtpDelegate
   attr_accessor :options, :active_message
+  attr_accessor :tls_support
   
   def initialize(options = { })
     @sent = [ ]
@@ -30,6 +31,10 @@ class SmtpDelegate
   
   def started_tls?
     !!@started_tls
+  end
+  
+  def tls_support?
+    !!@tls_support
   end
   
   def close_connection
@@ -250,8 +255,12 @@ class RemailerConnectionSmtpInterpreterTest < Test::Unit::TestCase
   def test_tls_connection_with_support
     delegate = SmtpDelegate.new(:use_tls => true)
     interpreter = Remailer::Connection::SmtpInterpreter.new(:delegate => delegate)
+    
+    assert_equal true, delegate.use_tls?
+    assert_equal :initialized, interpreter.state
 
     interpreter.process("220 mail.example.com ESMTP Exim 4.63\r\n")
+    assert_equal :ehlo, interpreter.state
     assert_equal 'EHLO localhost.local', delegate.read
     
     interpreter.process("250-mail.example.com Hello\r\n")
@@ -261,6 +270,8 @@ class RemailerConnectionSmtpInterpreterTest < Test::Unit::TestCase
     interpreter.process("250-PIPELINING\r\n")
     interpreter.process("250-STARTTLS\r\n")
     interpreter.process("250 HELP\r\n")
+    
+    assert_equal true, delegate.tls_support?
     
     assert_equal :starttls, interpreter.state
     assert_equal 'STARTTLS', delegate.read

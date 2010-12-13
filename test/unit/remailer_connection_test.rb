@@ -40,6 +40,8 @@ class RemailerConnectionTest < Test::Unit::TestCase
   def test_failed_connect_no_service
     engine do
       error_received = nil
+      on_error = false
+      on_connect = false
 
       connection = Remailer::Connection.open(
         'example.com',
@@ -47,6 +49,8 @@ class RemailerConnectionTest < Test::Unit::TestCase
         :error => lambda { |code, message|
           error_received = [ code, message ]
         },
+        :on_connect => lambda { on_connect = true },
+        :on_error => lambda { on_error = true },
         :timeout => 1
       )
 
@@ -55,6 +59,10 @@ class RemailerConnectionTest < Test::Unit::TestCase
       end
 
       assert_equal :timeout, error_received[0]
+      assert_equal :timeout, connection.error
+
+      assert_equal false, on_connect
+      assert_equal true, on_error
     end
   end
 

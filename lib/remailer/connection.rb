@@ -31,6 +31,7 @@ class Remailer::Connection < EventMachine::Connection
   attr_accessor :pipelining, :tls_support
   attr_accessor :timeout
   attr_accessor :options
+  attr_reader :error, :error_message
 
   # == Extensions ===========================================================
 
@@ -46,6 +47,8 @@ class Remailer::Connection < EventMachine::Connection
   # * debug => Where to send debugging output (IO or Proc)
   # * connect => Where to send a connection notification (IO or Proc)
   # * error => Where to send errors (IO or Proc)
+  # * on_connect => Called upon successful connection (Proc)
+  # * on_error => Called upon connection error (Proc)
   # A block can be supplied in which case it will stand in as the :connect
   # option. The block will recieve a first argument that is the status of
   # the connection, and an optional second that is a diagnostic message.
@@ -269,10 +272,11 @@ class Remailer::Connection < EventMachine::Connection
 
     error_notification(:timeout, "Connection timed out")
     debug_notification(:timeout, "Connection timed out")
-    send_callback(:timeout, "Connection timed out before send could complete")
+    message_callback(:timeout, "Connection timed out before send could complete")
 
     unless (@connected)
       connect_notification(false, "Connection timed out")
+      send_callback(:on_error)
     end
 
     close_connection
@@ -290,6 +294,10 @@ class Remailer::Connection < EventMachine::Connection
     !!@closed
   end
   
+  def error?
+    !!@error
+  end
+
   def start_tls
     debug_notification(:tls, "Started")
     super
@@ -332,7 +340,7 @@ class Remailer::Connection < EventMachine::Connection
   end
 
   def after_message_sent(reply_code, reply_message)
-    send_callback(reply_code, reply_message)
+    message_callback(reply_code, reply_message)
 
     @active_message = nil
   end
@@ -356,9 +364,13 @@ class Remailer::Connection < EventMachine::Connection
   
   def connect_notification(code, message = nil)
     send_notification(:connect, code, message || self.remote)
+    send_callback(:on_success)
   end
 
   def error_notification(code, message)
+    @error = code
+    @error_message = message
+
     send_notification(:error, code, message)
   end
 
@@ -366,7 +378,7 @@ class Remailer::Connection < EventMachine::Connection
     send_notification(:debug, code, message)
   end
 
-  def send_callback(reply_code, reply_message)
+  def message_callback(reply_code, reply_message)
     if (callback = (@active_message and @active_message[:callback]))
       # The callback is screened in advance when assigned to ensure that it
       # has only 1 or 2 arguments. There should be no else here.
@@ -375,6 +387,17 @@ class Remailer::Connection < EventMachine::Connection
         callback.call(reply_code, reply_message)
       when 1
         callback.call(reply_code)
+      end
+    end
+  end
+  
+  def send_callback(type)
+    if (callback = @options[type])
+      case (callback.arity)
+      when 1
+        callback.call(self)
+      else
+        callback.call
       end
     end
   end
