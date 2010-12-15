@@ -43,6 +43,8 @@ class Remailer::Connection < EventMachine::Connection
   # * port => Numerical port number (default is 25)
   # * require_tls => If true will fail connections to non-TLS capable
   #   servers (default is false)
+  # * username => Username to authenticate with the SMTP server (optional)
+  # * password => Password to authenticate with the SMTP server (optional)
   # * use_tls => Will use TLS if availble (default is true)
   # * debug => Where to send debugging output (IO or Proc)
   # * connect => Where to send a connection notification (IO or Proc)
@@ -77,6 +79,7 @@ class Remailer::Connection < EventMachine::Connection
       EventMachine.connect(host_name, host_port, self, options)
     rescue EventMachine::ConnectionError => e
        options[:connect].is_a?(Proc) and options[:connect].call(false, e.to_s)
+       options[:on_error].is_a?(Proc) and options[:on_error].call(e.to_s)
        options[:debug].is_a?(Proc) and options[:debug].call(:error, e.to_s)
        options[:error].is_a?(Proc) and options[:error].call(:connect_error, e.to_s)
     end
@@ -308,6 +311,7 @@ class Remailer::Connection < EventMachine::Connection
     super
     @closed = true
   end
+  alias_method :close, :close_connection
 
   def use_socks5_interpreter!
     @interpreter = Remailer::Connection::Socks5Interpreter.new(:delegate => self)
