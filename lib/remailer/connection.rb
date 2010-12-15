@@ -104,6 +104,7 @@ class Remailer::Connection < EventMachine::Connection
     # allow for debugging, exceptions are dumped to STDERR as a last resort.
     @options = options
     @hostname = @options[:hostname] || Socket.gethostname
+    @timeout = @options[:timeout] || DEFAULT_TIMEOUT
 
     @messages = [ ]
   
@@ -267,7 +268,7 @@ class Remailer::Connection < EventMachine::Connection
   end
 
   def reset_timeout!
-    @timeout_at = Time.now + (@options[:timeout] || DEFAULT_TIMEOUT)
+    @timeout_at = Time.now + @timeout
   end
   
   def check_for_timeouts!
@@ -368,7 +369,7 @@ class Remailer::Connection < EventMachine::Connection
   
   def connect_notification(code, message = nil)
     send_notification(:connect, code, message || self.remote)
-    send_callback(:on_success)
+    send_callback(:on_connect)
   end
 
   def error_notification(code, message)
