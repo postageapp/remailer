@@ -161,7 +161,7 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
   
   state :mail_from do
     enter do
-      delegate.send_line("MAIL FROM:#{delegate.active_message[:from]}")
+      delegate.send_line("MAIL FROM:<#{delegate.active_message[:from]}>")
     end
 
     interpret(250) do
@@ -171,7 +171,7 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
   
   state :rcpt_to do
     enter do
-      delegate.send_line("RCPT TO:#{delegate.active_message[:to]}")
+      delegate.send_line("RCPT TO:<#{delegate.active_message[:to]}>")
     end
     
     interpret(250) do

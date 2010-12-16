@@ -192,13 +192,13 @@ class RemailerConnectionSmtpInterpreterTest < Test::Unit::TestCase
     
     assert_equal :mail_from, interpreter.state
     
-    assert_equal 'MAIL FROM:from@example.com', delegate.read
+    assert_equal 'MAIL FROM:<from@example.com>', delegate.read
     
     interpreter.process("250 OK\r\n")
     
     assert_equal :rcpt_to, interpreter.state
 
-    assert_equal 'RCPT TO:to@example.com', delegate.read
+    assert_equal 'RCPT TO:<to@example.com>', delegate.read
     
     interpreter.process("250 Accepted\r\n")
     
