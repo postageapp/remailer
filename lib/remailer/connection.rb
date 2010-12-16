@@ -27,6 +27,7 @@ class Remailer::Connection < EventMachine::Connection
   
   # == Properties ===========================================================
   
+  attr_accessor :active_message
   attr_accessor :remote, :max_size, :protocol, :hostname
   attr_accessor :pipelining, :tls_support, :auth_support
   attr_accessor :timeout
@@ -193,12 +194,6 @@ class Remailer::Connection < EventMachine::Connection
       # ...send the message right away.
       after_ready
     end
-  end
-  
-  # Returns the details of the active message being sent, or nil if no message
-  # is being sent.
-  def active_message
-    @active_message
   end
   
   # Reassigns the timeout which is specified in seconds. Values equal to
