@@ -28,7 +28,7 @@ class Remailer::Connection < EventMachine::Connection
   # == Properties ===========================================================
   
   attr_accessor :remote, :max_size, :protocol, :hostname
-  attr_accessor :pipelining, :tls_support
+  attr_accessor :pipelining, :tls_support, :auth_support
   attr_accessor :timeout
   attr_accessor :options
   attr_reader :error, :error_message
@@ -139,6 +139,13 @@ class Remailer::Connection < EventMachine::Connection
   # capable servers.
   def tls_support?
     !!@tls_support
+  end
+
+  # Returns true if the connection has advertised authentication support, or
+  # false if not availble or could not be detected. This will only work with
+  # ESMTP capable servers.
+  def auth_support?
+    !!@auth_support
   end
   
   # Returns true if the connection will be using a proxy to connect, false
