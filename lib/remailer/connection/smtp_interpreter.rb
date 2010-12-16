@@ -253,7 +253,7 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
   end
   
   on_error do |reply_code, reply_message|
-    delegate.send_callback(reply_code, reply_message)
+    delegate.message_callback(reply_code, reply_message)
     delegate.debug_notification(:error, "[#{@state}] #{reply_code} #{reply_message}")
     delegate.error_notification(reply_code, reply_message)
     
