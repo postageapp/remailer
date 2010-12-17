@@ -52,6 +52,7 @@ class Remailer::Connection < EventMachine::Connection
   # * error => Where to send errors (IO or Proc)
   # * on_connect => Called upon successful connection (Proc)
   # * on_error => Called upon connection error (Proc)
+  # * on_disconnect => Called when connection is closed (Proc)
   # A block can be supplied in which case it will stand in as the :connect
   # option. The block will recieve a first argument that is the status of
   # the connection, and an optional second that is a diagnostic message.
@@ -214,12 +215,14 @@ class Remailer::Connection < EventMachine::Connection
   # a connection closed event.
   def unbind
     @interpreter = nil
-    
+
     if (@active_message)
       if (callback = @active_message[:callback])
         callback.call(nil)
       end
     end
+
+    send_callback(:on_disconnect)
   end
 
   # This implements the EventMachine::Connection#receive_data method that
@@ -321,30 +324,37 @@ class Remailer::Connection < EventMachine::Connection
     !!@closed
   end
   
+  # Returns true if an error has occurred, false otherwise.
   def error?
     !!@error
   end
-
+  
+  # EventMachine: Enables TLS support on the connection.
   def start_tls
     debug_notification(:tls, "Started")
     super
   end
-  
+
+  # EventMachine: Closes down the connection.
   def close_connection
+    send_callback(:on_disconnect)
     debug_notification(:closed, "Connection closed")
     super
     @closed = true
   end
   alias_method :close, :close_connection
 
+  # Switches to use the SOCKS5 interpreter for all subsequent communication
   def use_socks5_interpreter!
     @interpreter = Remailer::Connection::Socks5Interpreter.new(:delegate => self)
   end
 
+  # Switches to use the SMTP interpreter for all subsequent communication
   def use_smtp_interpreter!
     @interpreter = Remailer::Connection::SmtpInterpreter.new(:delegate => self)
   end
 
+  # Callback receiver for when the proxy connection has been completed.
   def after_proxy_connected
     use_smtp_interpreter!
   end
