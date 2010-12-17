@@ -131,6 +131,7 @@ class Remailer::Connection < EventMachine::Connection
     STDERR.puts "#{e.class}: #{e}"
   end
   
+  # Returns true if the connection requires TLS support, or false otherwise.
   def use_tls?
     !!@options[:use_tls]
   end
@@ -239,15 +240,25 @@ class Remailer::Connection < EventMachine::Connection
   end
 
   def post_init
-    EventMachine.add_periodic_timer(1) do
+    @timer = EventMachine.add_periodic_timer(1) do
       check_for_timeouts!
     end
   end
   
+  #
+  def detach
+    @timer.cancel
+    super
+  end
+  
+  # Returns the current state of the active interpreter, or nil if no state
+  # is assigned.
   def state
     @interpreter and @interpreter.state
   end
 
+  # Sends a single line to the remote host with the appropriate CR+LF
+  # delmiter at the end.
   def send_line(line = '')
     reset_timeout!
 
@@ -269,12 +280,17 @@ class Remailer::Connection < EventMachine::Connection
     nil
   end
 
+  # Resets the timeout time. Returns the time at which a timeout will occur.
   def reset_timeout!
     @timeout_at = Time.now + @timeout
   end
   
+  # Checks for a timeout condition, and if one is detected, will close the
+  # connection and send appropriate callbacks.
   def check_for_timeouts!
     return if (!@timeout_at or Time.now < @timeout_at)
+
+    @timeout_at = nil
 
     error_notification(:timeout, "Connection timed out")
     debug_notification(:timeout, "Connection timed out")
@@ -288,14 +304,19 @@ class Remailer::Connection < EventMachine::Connection
     close_connection
   end
   
+  # Returns true if pipelining support has been detected on the connection,
+  # false otherwise.
   def pipelining?
     !!@pipelining
   end
 
+  # Returns true if pipelining support has been detected on the connection,
+  # false otherwise.
   def tls_support?
     !!@tls_support
   end
   
+  # Returns true if the connection has been closed, false otherwise.
   def closed?
     !!@closed
   end
