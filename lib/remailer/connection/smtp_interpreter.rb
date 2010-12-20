@@ -49,6 +49,15 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
         enter_state(:helo)
       end
     end
+    
+    interpret(421) do |message|
+      delegate.connect_notification(false, "Connection timed out")
+      delegate.debug_notification(:error, "[#{@state}] #{reply_code} #{reply_message}")
+      delegate.error_notification(reply_code, reply_message)
+      delegate.send_callback(:on_error)
+
+      enter_state(:terminated)
+    end
   end
   
   state :helo do
@@ -161,7 +170,12 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
   
   state :mail_from do
     enter do
-      delegate.send_line("MAIL FROM:<#{delegate.active_message[:from]}>")
+      if (delegate.active_message)
+        delegate.send_line("MAIL FROM:<#{delegate.active_message[:from]}>")
+      else
+        delegate.message_callback(false, "Delegate has no active message")
+        enter_state(:reset)
+      end
     end
 
     interpret(250) do
@@ -171,7 +185,12 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
   
   state :rcpt_to do
     enter do
-      delegate.send_line("RCPT TO:<#{delegate.active_message[:to]}>")
+      if (delegate.active_message)
+        delegate.send_line("RCPT TO:<#{delegate.active_message[:to]}>")
+      else
+        delegate.message_callback(false, "Delegate has no active message")
+        enter_state(:reset)
+      end
     end
     
     interpret(250) do
