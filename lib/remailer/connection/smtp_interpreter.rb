@@ -52,8 +52,8 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
     
     interpret(421) do |message|
       delegate.connect_notification(false, "Connection timed out")
-      delegate.debug_notification(:error, "[#{@state}] #{reply_code} #{reply_message}")
-      delegate.error_notification(reply_code, reply_message)
+      delegate.debug_notification(:error, "[#{@state}] 421 #{message}")
+      delegate.error_notification(421, message)
       delegate.send_callback(:on_error)
 
       enter_state(:terminated)
