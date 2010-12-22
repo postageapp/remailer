@@ -407,6 +407,8 @@ class Remailer::Connection < EventMachine::Connection
   end
   
   def connect_notification(code, message = nil)
+    @connected = code
+
     send_notification(:connect, code, message || self.remote)
     send_callback(:on_connect) if (code)
   end
