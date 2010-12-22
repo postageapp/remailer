@@ -301,9 +301,9 @@ class Remailer::Connection < EventMachine::Connection
       debug_notification(:timeout, "Response timed out")
       send_callback(:on_error)
     elsif (!@connected)
-      connect_notification(false, "Connection timed out")
-      debug_notification(:timeout, "Connection timed out")
-      error_notification(:timeout, "Connection timed out")
+      connect_notification(false, "Timed out before a connection could be established")
+      debug_notification(:timeout, "Timed out before a connection could be established")
+      error_notification(:timeout, "Timed out before a connection could be established")
       send_callback(:on_error)
     else
       send_callback(:on_disconnect)
