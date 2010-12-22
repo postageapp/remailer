@@ -295,7 +295,7 @@ class Remailer::Connection < EventMachine::Connection
 
     @timeout_at = nil
 
-    if (@connected and delegate.active_message)
+    if (@connected and @active_message)
       message_callback(:timeout, "Response timed out before send could complete")
       error_notification(:timeout, "Response timed out")
       debug_notification(:timeout, "Response timed out")
