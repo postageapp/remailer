@@ -346,6 +346,7 @@ class Remailer::Connection < EventMachine::Connection
     debug_notification(:closed, "Connection closed")
     super
     @closed = true
+    @timeout_at = nil
   end
   alias_method :close, :close_connection
 
