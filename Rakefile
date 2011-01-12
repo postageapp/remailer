@@ -6,7 +6,7 @@ begin
   Jeweler::Tasks.new do |gem|
     gem.name = "remailer"
     gem.summary = %Q{Reactor-Ready SMTP Mailer}
-    gem.description = %Q{EventMachine capable SMTP engine}
+    gem.description = %Q{EventMachine SMTP Mail User Agent}
     gem.email = "scott@twg.ca"
     gem.homepage = "http://github.com/twg/remailer"
     gem.authors = [ "Scott Tadman" ]

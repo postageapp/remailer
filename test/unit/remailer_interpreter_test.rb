@@ -22,6 +22,24 @@ class AutomaticDelegate
   end
 end
 
+class LineInterpreter < Remailer::Interpreter
+  attr_reader :lines
+  
+  state :initialized do
+    enter do
+      @lines = [ ]
+    end
+  end
+  
+  parse(/^.*?\r?\n/) do |data|
+    data.chomp
+  end
+  
+  default do |line|
+    @lines << line
+  end
+end
+
 class ExampleInterpreter < Remailer::Interpreter
   include TestTriggerHelper
 
@@ -65,7 +83,7 @@ end
 
 class RemailerInterpreterTest < Test::Unit::TestCase
   def test_default_state
-    assert_equal [ :initialized, :terminated ], Remailer::Interpreter.states_defined
+    assert_equal [ :initialized, :terminated ], Remailer::Interpreter.states_defined.collect { |s| s.to_s }.sort.collect { |s| s.to_sym }
     assert_equal true, Remailer::Interpreter.state_defined?(:initialized)
     assert_equal true, Remailer::Interpreter.state_defined?(:terminated)
     assert_equal false, Remailer::Interpreter.state_defined?(:unknown)
@@ -120,6 +138,55 @@ class RemailerInterpreterTest < Test::Unit::TestCase
 
     assert_equal 'Stop message', interpreter.message
     assert_equal :terminated, interpreter.state
+  end
+  
+  def test_interpreter_can_process
+    interpreter = LineInterpreter.new
+
+    assert_equal [ ], interpreter.lines
+    
+    line = "EXAMPLE LINE\n"
+    
+    interpreter.process(line)
+    
+    assert_equal 'EXAMPLE LINE', interpreter.lines[-1]
+    assert_equal '', line
+    
+    line << "ANOTHER EXAMPLE LINE\r\n"
+    
+    interpreter.process(line)
+    
+    assert_equal 'ANOTHER EXAMPLE LINE', interpreter.lines[-1]
+    assert_equal '', line
+    
+    line << "LINE ONE\r\nLINE TWO\r\n"
+    
+    interpreter.process(line)
+    
+    assert_equal 'LINE ONE', interpreter.lines[-2]
+    assert_equal 'LINE TWO', interpreter.lines[-1]
+    assert_equal '', line
+    
+    line << "INCOMPLETE LINE"
+    
+    interpreter.process(line)
+
+    assert_equal 'LINE TWO', interpreter.lines[-1]
+    assert_equal "INCOMPLETE LINE", line
+    
+    line << "\r"
+    
+    interpreter.process(line)
+
+    assert_equal 'LINE TWO', interpreter.lines[-1]
+    assert_equal "INCOMPLETE LINE\r", line
+    
+    line << "\n"
+    
+    interpreter.process(line)
+
+    assert_equal 'INCOMPLETE LINE', interpreter.lines[-1]
+    assert_equal '', line
   end
 
   def test_default_handler_for_interpreter

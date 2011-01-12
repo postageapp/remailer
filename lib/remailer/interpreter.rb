@@ -59,6 +59,11 @@ class Remailer::Interpreter
     StateProxy.new(config, &block)
   end
   
+  # This is a method to convert a spec and a block into a proper parser
+  # method. If spec is specified, it should be a Fixnum, or a Regexp. A 
+  # Fixnum defines a  minimum size to process, useful for packed binary
+  # streams, and a Regexp defines a pattern that must match before the parser
+  # is engaged.
   def self.parser_for_spec(spec, &block)
     case (spec)
     when nil
@@ -100,7 +105,7 @@ class Remailer::Interpreter
     @on_error = block
   end
   
-  # Returns the currently defined parser.
+  # Returns the parser used when no state-specific parser has been defined.
   def self.default_parser
     @parser ||= lambda { |s| _s = s.dup; s.replace(''); _s }
   end
@@ -152,9 +157,10 @@ class Remailer::Interpreter
   end
   
   # Parses a given string and returns the first interpretable token, if any,
-  # or nil otherwise. The string is not modified.
-  def parse(s)
-    instance_exec(s, &parser)
+  # or nil otherwise. If an interpretable token is found, the supplied string
+  # will be modified to have that matching portion removed.
+  def parse(buffer)
+    instance_exec(buffer, &parser)
   end
   
   # Returns the parser defined for the current state, or the default parser.
@@ -184,7 +190,8 @@ class Remailer::Interpreter
   # Interprets a given object with an optional set of arguments. The actual
   # interpretation should be defined by declaring a state with an interpret
   # block defined.
-  def interpret(object, *args)
+  def interpret(*args)
+    object = args.first
     config = self.class.states[@state]
     callbacks = (config and config[:interpret])
     
@@ -194,16 +201,17 @@ class Remailer::Interpreter
       end
     
       if (matched)
+        args.shift
         instance_exec(*args, &proc)
 
         return true
       end
     end
     
-    if (trigger_callbacks(@state, :default, *([ object ] + args)))
+    if (trigger_callbacks(@state, :default, *args))
       # Handled by default
       true
-    elsif (proc = self.class.default)
+    elsif (proc = self.class.default_interpreter)
       instance_exec(*args, &proc)
     else
       if (proc = self.class.on_error_handler)

@@ -253,7 +253,7 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
   
   state :reset do
     enter do
-      delegate.send_line("RESET")
+      delegate.send_line("RSET")
     end
     
     interpret(250) do
