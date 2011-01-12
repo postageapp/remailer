@@ -23,7 +23,7 @@ class Proc
   end
 end
 
-unless (Hash.respond_to?(:slice))
+unless (Hash.new.respond_to?(:slice))
   class Hash
     def slice(*keys)
       keys.inject({ }) do |h, k|

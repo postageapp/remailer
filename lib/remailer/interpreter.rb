@@ -150,8 +150,13 @@ class Remailer::Interpreter
   # include:
   # * :delegate => Which object to use as a delegate, if applicable.
   # * :state => What the initial state should be. The default is :initalized
+  # If a block is supplied, the interpreter object is supplied as an argument
+  # to give the caller an opportunity to perform any initial configuration
+  # before the first state is entered.
   def initialize(options = nil)
     @delegate = (options and options[:delegate])
+    
+    yield(self) if (block_given?)
     
     enter_state(options && options[:state] || self.class.initial_state)
   end

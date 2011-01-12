@@ -101,6 +101,10 @@ class ExampleInterpreter < Remailer::Interpreter
   end
 end
 
+class InterpreterWithAccessor < Remailer::Interpreter
+  attr_accessor :example
+end
+
 class RemailerInterpreterTest < Test::Unit::TestCase
   def test_default_state
     assert_equal [ :initialized, :terminated ], Remailer::Interpreter.states_defined.collect { |s| s.to_s }.sort.collect { |s| s.to_sym }
@@ -282,5 +286,17 @@ class RemailerInterpreterTest < Test::Unit::TestCase
 
     assert interpreter.error.index(':initialized')
     assert interpreter.error.index(':invalid')
+  end
+  
+  def test_new_with_block
+    interpreter = InterpreterWithAccessor.new
+    
+    assert_equal nil, interpreter.example
+
+    interpreter = InterpreterWithAccessor.new do |interpreter|
+      interpreter.example = 'example'
+    end
+    
+    assert_equal 'example', interpreter.example
   end
 end
