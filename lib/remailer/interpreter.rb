@@ -31,10 +31,16 @@ class Remailer::Interpreter
   # Returns the states that are defined as a has with their associated
   # options. The default keys are :initialized and :terminated.
   def self.states
-    @states ||= {
-      :initialized => { },
-      :terminated => { }
-    }
+    @states ||=
+      case (superclass.respond_to?(:states))
+      when true
+        superclass.states.dup
+      else
+        {
+          :initialized => { },
+          :terminated => { }
+        }
+      end
   end
   
   # Returns true if a given state is defined, false otherwise.
@@ -64,7 +70,7 @@ class Remailer::Interpreter
   # Fixnum defines a  minimum size to process, useful for packed binary
   # streams, and a Regexp defines a pattern that must match before the parser
   # is engaged.
-  def self.parser_for_spec(spec, &block)
+  def self.create_parser_for_spec(spec, &block)
     case (spec)
     when nil
       block
@@ -91,7 +97,7 @@ class Remailer::Interpreter
   # Defines a parser for this interpreter. The supplied block is executed in
   # the context of a parser instance.
   def self.parse(spec = nil, &block)
-    @parser = parser_for_spec(spec, &block)
+    @parser = create_parser_for_spec(spec, &block)
   end
   
   # Assigns the default interpreter.
@@ -107,17 +113,35 @@ class Remailer::Interpreter
   
   # Returns the parser used when no state-specific parser has been defined.
   def self.default_parser
-    @parser ||= lambda { |s| _s = s.dup; s.replace(''); _s }
+    @parser ||=
+      case (superclass.respond_to?(:default_parser))
+      when true
+        superclass.default_parser
+      else
+        lambda { |s| _s = s.dup; s.replace(''); _s }
+      end
   end
   
   # Returns the current default_interpreter.
   def self.default_interpreter
-    @default
+    @default ||=
+      case (superclass.respond_to?(:default_interpreter))
+      when true
+        superclass.default_interpreter
+      else
+        nil
+      end
   end
   
   # Returns the defined error handler
   def self.on_error_handler
-    @on_error
+    @on_error ||=
+      case (superclass.respond_to?(:on_error_handler))
+      when true
+        superclass.on_error_handler
+      else
+        nil
+      end
   end
 
   # == Instance Methods =====================================================
@@ -191,17 +215,39 @@ class Remailer::Interpreter
   # interpretation should be defined by declaring a state with an interpret
   # block defined.
   def interpret(*args)
-    object = args.first
+    object = args[0]
     config = self.class.states[@state]
-    callbacks = (config and config[:interpret])
+    interpreters = (config and config[:interpret])
     
-    if (callbacks)
-      matched, proc = callbacks.find do |on, proc|
-        object == on
+    if (interpreters)
+      match_result = nil
+      
+      matched, proc = interpreters.find do |response, proc|
+        case (response)
+        when Regexp
+          match_result = response.match(object)
+        else
+          response === object
+        end
       end
-    
+      
       if (matched)
-        args.shift
+        case (matched)
+        when Regexp
+          match_result = match_result.to_a
+          
+          if (match_result.length > 1)
+            match_string = match_result.shift
+            args[0, 1] = match_result
+          else
+            args[0].sub!(match_result[0], '')
+          end
+        when String
+          args[0].sub!(matched, '')
+        else
+          args.shift
+        end
+        
         instance_exec(*args, &proc)
 
         return true

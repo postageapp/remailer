@@ -40,6 +40,26 @@ class LineInterpreter < Remailer::Interpreter
   end
 end
 
+class LineInterpreterSubclass < LineInterpreter
+  parse(/^.*?\0/) do |data|
+    data.sub(/\0$/, '')
+  end
+end
+
+class RegexpInterpreter < Remailer::Interpreter
+  attr_reader :received
+  
+  state :initialized do
+    interpret(/^HELO\s+/) do |line|
+      @received = [ :helo, line ]
+    end
+
+    interpret(/^MAIL FROM:<([^>]+)>/) do |line|
+      @received = [ :mail_from, line ]
+    end
+  end
+end
+
 class ExampleInterpreter < Remailer::Interpreter
   include TestTriggerHelper
 
@@ -91,6 +111,12 @@ class RemailerInterpreterTest < Test::Unit::TestCase
     interpreter = Remailer::Interpreter.new
     
     assert_equal :initialized, interpreter.state
+    
+    buffer = 'a'
+    
+    interpreter.parse(buffer)
+    
+    assert_equal '', buffer
   end
   
   def test_delegate
@@ -187,6 +213,46 @@ class RemailerInterpreterTest < Test::Unit::TestCase
 
     assert_equal 'INCOMPLETE LINE', interpreter.lines[-1]
     assert_equal '', line
+  end
+  
+  def test_interpreter_subclass
+    interpreter = LineInterpreterSubclass.new
+    
+    assert_equal [ ], interpreter.lines
+    
+    line = "TEST"
+    
+    interpreter.process(line)
+    
+    assert_equal nil, interpreter.lines[-1]
+    assert_equal "TEST", line
+    
+    line << "\0"
+
+    interpreter.process(line)
+    
+    assert_equal "TEST", interpreter.lines[-1]
+    assert_equal "", line
+  end
+  
+  def test_regexp_interpreter
+    interpreter = RegexpInterpreter.new
+    
+    assert_equal nil, interpreter.received
+    
+    line = "HELO example.com"
+    
+    interpreter.process(line)
+    assert_equal '', line
+    
+    assert_equal [ :helo, 'example.com' ], interpreter.received
+    
+    line = "MAIL FROM:<example@example.com>"
+    
+    interpreter.process(line)
+    assert_equal '', line
+    
+    assert_equal [ :mail_from, 'example@example.com' ], interpreter.received
   end
 
   def test_default_handler_for_interpreter
