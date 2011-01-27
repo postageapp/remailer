@@ -8,7 +8,7 @@ class Remailer::Interpreter::StateProxy
   end
   
   def parse(spec = nil, &block)
-    @options[:parser] = Remailer::Interpreter.parser_for_spec(spec, &block)
+    @options[:parser] = Remailer::Interpreter.parse(spec, &block)
   end
   
   def enter(&block)
