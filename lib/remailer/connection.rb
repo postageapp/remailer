@@ -77,14 +77,38 @@ class Remailer::Connection < EventMachine::Connection
       host_port = proxy_options[:port] || SOCKS5_PORT
     end
 
-    begin
-      EventMachine.connect(host_name, host_port, self, options)
-    rescue EventMachine::ConnectionError => e
-       options[:connect].is_a?(Proc) and options[:connect].call(false, e.to_s)
-       options[:on_error].is_a?(Proc) and options[:on_error].call(e.to_s)
-       options[:debug].is_a?(Proc) and options[:debug].call(:error, e.to_s)
-       options[:error].is_a?(Proc) and options[:error].call(:connect_error, e.to_s)
+    EventMachine.connect(host_name, host_port, self, options)
+
+  rescue EventMachine::ConnectionError => e
+    case (options[:connect])
+    when Proc
+      options[:connect].call(false, e.to_s)
+    when IO
+      options[:connect].puts(e.to_s)
     end
+    
+    case (options[:on_error])
+    when Proc
+      options[:on_error].call(e.to_s)
+    when IO
+      options[:on_error].puts(e.to_s)
+    end
+
+    case (options[:debug])
+    when Proc
+      options[:debug].call(:error, e.to_s)
+    when IO
+      options[:debug].puts(e.to_s)
+    end
+    
+    case (options[:error])
+    when Proc
+      options[:error].call(:connect_error, e.to_s)
+    when IO
+      options[:error].puts(e.to_s)
+    end
+    
+    false
   end
   
   # Warns about supplying a Proc which does not appear to accept the required

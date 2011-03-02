@@ -10,6 +10,7 @@ begin
     gem.email = "scott@twg.ca"
     gem.homepage = "http://github.com/twg/remailer"
     gem.authors = [ "Scott Tadman" ]
+    gem.add_runtime_dependency 'eventmachine'
   end
   Jeweler::GemcutterTasks.new
 rescue LoadError

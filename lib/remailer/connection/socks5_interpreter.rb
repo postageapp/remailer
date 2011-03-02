@@ -62,11 +62,11 @@ class Remailer::Connection::Socks5Interpreter < Remailer::Interpreter
     end
     
     parse do |s|
-      return unless (s.length >= 2)
+      if (s.length >= 2)
+        version, method = s.slice!(0,2).unpack('CC')
       
-      version, method = s.slice!(0,2).unpack('CC')
-      
-      method
+        method
+      end
     end
     
     interpret(SOCKS5_METHOD[:username_password]) do
@@ -168,7 +168,7 @@ class Remailer::Connection::Socks5Interpreter < Remailer::Interpreter
   state :failed do
     enter do
       message = "Proxy server returned error code #{@reply}: #{SOCKS5_REPLY[@reply]}"
-      delegate.debug(:error, message)
+      delegate.debug_notification(:error, message)
       delegate.connect_notification(false, message)
       delegate.close_connection
     end
