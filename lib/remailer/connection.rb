@@ -325,9 +325,23 @@ class Remailer::Connection < EventMachine::Connection
       debug_notification(:timeout, "Response timed out")
       send_callback(:on_error)
     elsif (!@connected)
-      connect_notification(false, "Timed out before a connection could be established")
-      debug_notification(:timeout, "Timed out before a connection could be established")
-      error_notification(:timeout, "Timed out before a connection could be established")
+      remote_options = @options
+      
+      case (@interpreter)
+      when Remailer::Connection::Socks5Interpreter
+        remote_options = @options[:proxy]
+      end
+      
+      message = "Timed out before a connection could be established to #{remote_options[:host]}:#{remote_options[:port]}"
+      
+      if (@interpreter)
+        message << " using #{@interpreter.label}"
+      end
+      
+      connect_notification(false, message)
+      debug_notification(:timeout, message)
+      error_notification(:timeout, message)
+
       send_callback(:on_error)
     else
       send_callback(:on_disconnect)

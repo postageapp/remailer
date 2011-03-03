@@ -108,18 +108,18 @@ class Remailer::Connection::Socks5Interpreter < Remailer::Interpreter
     end
     
     parse do |s|
-      return unless (s.length >= 10)
-    
-      version, reply, reserved, address_type, address, port = s.slice!(0,10).unpack('CCCCNn')
+      if (s.length >= 10)
+        version, reply, reserved, address_type, address, port = s.slice!(0,10).unpack('CCCCNn')
       
-      [
-        reply,
-        {
-          :address => address,
-          :port => port,
-          :address_type => address_type
-        }
-      ]
+        [
+          reply,
+          {
+            :address => address,
+            :port => port,
+            :address_type => address_type
+          }
+        ]
+      end
     end
   
     interpret(0) do
