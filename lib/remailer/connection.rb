@@ -316,8 +316,9 @@ class Remailer::Connection < EventMachine::Connection
   # Checks for a timeout condition, and if one is detected, will close the
   # connection and send appropriate callbacks.
   def check_for_timeouts!
-    return if (!@timeout_at or Time.now < @timeout_at)
+    return if (!@timeout_at or Time.now < @timeout_at or @timed_out)
 
+    @timed_out = true
     @timeout_at = nil
 
     if (@connected and @active_message)
