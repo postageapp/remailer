@@ -170,6 +170,7 @@ class Remailer::Connection::Socks5Interpreter < Remailer::Interpreter
       message = "Proxy server returned error code #{@reply}: #{SOCKS5_REPLY[@reply]}"
       delegate.debug_notification(:error, message)
       delegate.connect_notification(false, message)
+      delegate.error_notification("SOCKS5_#{@reply}", message)
       delegate.close_connection
     end
     
