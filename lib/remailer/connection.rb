@@ -221,6 +221,31 @@ class Remailer::Connection < EventMachine::Connection
       after_ready
     end
   end
+
+  # Tests the validity of an email address through the connection at the
+  # earliest opportunity. A callback block can be supplied that will be
+  # executed when the address has been tested, an unexpected result occurred,
+  # or the request timed out.
+  def test_email(from, to, &block)
+    if (block_given?)
+      self.class.warn_about_arguments(block, 1..2)
+    end
+    
+    message = {
+      :from => from,
+      :to => to,
+      :test => true,
+      :callback => block
+    }
+    
+    @messages << message
+    
+    # If the connection is ready to send...
+    if (@interpreter and @interpreter.state == :ready)
+      # ...send the message right away.
+      after_ready
+    end
+  end
   
   # Reassigns the timeout which is specified in seconds. Values equal to
   # or less than zero are ignored and a default is used instead.

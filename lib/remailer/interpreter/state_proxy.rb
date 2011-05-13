@@ -18,7 +18,19 @@ class Remailer::Interpreter::StateProxy
   
   def interpret(response, &block)
     @options[:interpret] ||= [ ]
-    @options[:interpret] << [ response, block ]
+    
+    handler =
+      case (block.arity)
+      when 0
+        # Specifying a block with no arguments will mean that it waits until
+        # all pieces are collected before transitioning to a new state, 
+        # waiting until the continue flag is false.
+        Proc.new { |m,c| instance_exec(&block) unless (c) }
+      else
+        block
+      end
+    
+    @options[:interpret] << [ response, handler ]
   end
   
   def default(&block)

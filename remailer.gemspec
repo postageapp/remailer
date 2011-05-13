@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = %q{remailer}
-  s.version = "0.4.5"
+  s.version = "0.4.6"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Scott Tadman"]
-  s.date = %q{2011-05-12}
+  s.date = %q{2011-05-13}
   s.description = %q{EventMachine SMTP Mail User Agent}
   s.email = %q{scott@twg.ca}
   s.extra_rdoc_files = [

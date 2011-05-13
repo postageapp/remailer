@@ -37,16 +37,23 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
   end
   
   state :initialized do
-    interpret(220) do |message|
+    interpret(220) do |message, continues|
       message_parts = message.split(/\s+/)
       delegate.remote = message_parts.first
       
       if (message_parts.include?('ESMTP'))
         delegate.protocol = :esmtp
-        enter_state(:ehlo)
       else
         delegate.protocol = :smtp
-        enter_state(:helo)
+      end
+
+      unless (continues)
+        case (delegate.protocol)
+        when :esmtp
+          enter_state(:ehlo)
+        else
+          enter_state(:helo)
+        end
       end
     end
     
@@ -66,7 +73,11 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
     end
 
     interpret(250) do
-      enter_state(:established)
+      if (delegate.requires_authentication?)
+        enter_state(:auth)
+      else
+        enter_state(:established)
+      end
     end
   end
   
@@ -181,6 +192,22 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
     interpret(250) do
       enter_state(:rcpt_to)
     end
+    
+    interpret(503) do |message, continues|
+      if (message.match(/5\.5\.1/))
+        enter_state(:re_helo)
+      end
+    end
+  end
+  
+  state :re_helo do
+    enter do
+      delegate.send_line("HELO #{delegate.hostname}")
+    end
+    
+    interpret(250) do
+      enter_state(:mail_from)
+    end
   end
   
   state :rcpt_to do
@@ -194,7 +221,11 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
     end
     
     interpret(250) do
-      enter_state(:data)
+      if (delegate.active_message[:test])
+        enter_state(:reset)
+      else
+        enter_state(:data)
+      end
     end
   end
   
