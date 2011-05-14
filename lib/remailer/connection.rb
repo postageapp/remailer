@@ -131,6 +131,7 @@ class Remailer::Connection < EventMachine::Connection
     @options = options
     @hostname = @options[:hostname] || Socket.gethostname
     @timeout = @options[:timeout] || DEFAULT_TIMEOUT
+    @protocol = :smtp
 
     @messages = [ ]
   

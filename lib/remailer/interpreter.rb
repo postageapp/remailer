@@ -223,7 +223,7 @@ class Remailer::Interpreter
     object = args[0]
     config = self.class.states[@state]
     interpreters = (config and config[:interpret])
-    
+
     if (interpreters)
       match_result = nil
       
@@ -235,12 +235,12 @@ class Remailer::Interpreter
           response === object
         end
       end
-      
+    
       if (matched)
         case (matched)
         when Regexp
           match_result = match_result.to_a
-          
+        
           if (match_result.length > 1)
             match_string = match_result.shift
             args[0, 1] = match_result
@@ -252,8 +252,11 @@ class Remailer::Interpreter
         else
           args.shift
         end
-        
-        instance_exec(*args, &proc)
+      
+        # Specifying a block with no arguments will mean that it waits until
+        # all pieces are collected before transitioning to a new state, 
+        # waiting until the continue flag is false.
+        will_interpret?(proc, args) and instance_exec(*args, &proc)
 
         return true
       end
@@ -274,6 +277,13 @@ class Remailer::Interpreter
 
       false
     end
+  end
+  
+  # This method is used by interpret to determine if the supplied block should
+  # be executed or not. The default behavior is to always execute but this
+  # can be modified in sub-classes.
+  def will_interpret?(proc, args)
+    true
   end
   
   # Returns true if an error has been generated, false otherwise. The error

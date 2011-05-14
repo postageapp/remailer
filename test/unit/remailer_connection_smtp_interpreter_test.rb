@@ -1,12 +1,13 @@
 require File.expand_path(File.join(*%w[ .. helper ]), File.dirname(__FILE__))
 
 class SmtpDelegate
-  attr_accessor :options, :active_message
+  attr_accessor :options, :protocol, :active_message
   attr_accessor :tls_support
   
   def initialize(options = { })
     @sent = [ ]
     @options = options
+    @protocol = :smtp
   end
   
   def hostname
@@ -251,6 +252,28 @@ class RemailerConnectionSmtpInterpreterTest < Test::Unit::TestCase
     assert_equal :terminated, interpreter.state
     assert_equal true, delegate.closed?
   end
+  
+  def test_multi_line_hello_response
+    delegate = SmtpDelegate.new(:use_tls => true)
+    interpreter = Remailer::Connection::SmtpInterpreter.new(:delegate => delegate)
+
+    assert_equal :initialized, interpreter.state
+    assert_equal :smtp, delegate.protocol
+
+    interpreter.process("220-mail.example.com Hello ESMTP Example Server\r\n")
+    assert_equal :initialized, interpreter.state
+    assert_equal :esmtp, delegate.protocol
+
+    interpreter.process("220-This is a long notice that is posted here\r\n")
+    assert_equal :initialized, interpreter.state
+
+    interpreter.process("220-as some servers like to have a little chat\r\n")
+    assert_equal :initialized, interpreter.state
+
+    interpreter.process("220 with you before getting down to business.\r\n")
+
+    assert_equal :ehlo, interpreter.state
+  end
 
   def test_tls_connection_with_support
     delegate = SmtpDelegate.new(:use_tls => true)
@@ -298,7 +321,33 @@ class RemailerConnectionSmtpInterpreterTest < Test::Unit::TestCase
     assert_equal :ready, interpreter.state
   end
 
-  def test_basic_plaintext_auth_accepted
+  def test_basic_smtp_plaintext_auth_accepted
+    delegate = SmtpDelegate.new(:username => 'tester@example.com', :password => 'tester')
+    interpreter = Remailer::Connection::SmtpInterpreter.new(:delegate => delegate)
+    
+    assert delegate.requires_authentication?
+
+    assert_equal :initialized, interpreter.state
+
+    interpreter.process("220 mail.example.com SMTP Server 1.0\r\n")
+    assert_equal 'HELO localhost.local', delegate.read
+
+    assert_equal :helo, interpreter.state, interpreter.error
+    
+    interpreter.process("250-mail.example.com Hello\r\n")
+    interpreter.process("250 HELP\r\n")
+    
+    assert_equal false, delegate.started_tls?
+
+    assert_equal :auth, interpreter.state
+    assert_equal "AUTH PLAIN AHRlc3RlckBleGFtcGxlLmNvbQB0ZXN0ZXI=", delegate.read
+    
+    interpreter.process("235 Accepted\r\n")
+    
+    assert_equal :ready, interpreter.state
+  end
+
+  def test_basic_esmtp_plaintext_auth_accepted
     delegate = SmtpDelegate.new(:username => 'tester@example.com', :password => 'tester')
     interpreter = Remailer::Connection::SmtpInterpreter.new(:delegate => delegate)
 
@@ -318,7 +367,7 @@ class RemailerConnectionSmtpInterpreterTest < Test::Unit::TestCase
     assert_equal :ready, interpreter.state
   end
 
-  def test_basic_plaintext_auth_rejected
+  def test_basic_esmtp_plaintext_auth_rejected
     delegate = SmtpDelegate.new(:username => 'tester@example.com', :password => 'tester')
     interpreter = Remailer::Connection::SmtpInterpreter.new(:delegate => delegate)
 

@@ -8,11 +8,10 @@ require 'timeout'
 require 'thwait'
 require 'rubygems'
 
-if (Gem.available?('eventmachine'))
-  gem 'eventmachine'
+begin
   require 'eventmachine'
-else
-  raise "EventMachine gem is not installed."
+rescue => e
+  raise "EventMachine gem could not be loaded: #{e.class}: #{e}"
 end
 
 require 'remailer'

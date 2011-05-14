@@ -41,10 +41,8 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
       message_parts = message.split(/\s+/)
       delegate.remote = message_parts.first
       
-      if (message_parts.include?('ESMTP'))
+      if (message.match(/\bESMTP\b/))
         delegate.protocol = :esmtp
-      else
-        delegate.protocol = :smtp
       end
 
       unless (continues)
@@ -316,5 +314,13 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
 
   def label
     'SMTP'
+  end
+
+  def will_interpret?(proc, args)
+    # Can only interpret blocks if the last part of the message has been
+    # received. The continue flag is argument index 1. This will only apply
+    # to interpret blocks that do not receive arguments.
+  
+    (proc.arity == 0) ? !args[1] : true
   end
 end
