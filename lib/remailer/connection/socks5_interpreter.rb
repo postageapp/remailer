@@ -104,7 +104,7 @@ class Remailer::Connection::Socks5Interpreter < Remailer::Interpreter
           ].pack('CCCCA4n')
         )
       else
-        delegate.send_callback(:error_connecting, "Could not resolve hostname #{delegate.options[:host]}")
+        @error_message = "Could not resolve hostname #{delegate.options[:host]}"
         enter_state(:failed)
       end
     end
@@ -169,10 +169,15 @@ class Remailer::Connection::Socks5Interpreter < Remailer::Interpreter
   
   state :failed do
     enter do
-      message = "Proxy server returned error code #{@reply}: #{SOCKS5_REPLY[@reply]}"
-      delegate.debug_notification(:error, message)
+      if (@error_message)
+        delegate.debug_notification(:error, @error_message)
+        delegate.error_notification("SOCKS5", @error_message)
+      else
+        message = "Proxy server returned error code #{@reply}: #{SOCKS5_REPLY[@reply]}"
+        delegate.debug_notification(:error, message)
+        delegate.error_notification("SOCKS5_#{@reply}", message)
+      end
       delegate.connect_notification(false, message)
-      delegate.error_notification("SOCKS5_#{@reply}", message)
       delegate.close_connection
     end
     

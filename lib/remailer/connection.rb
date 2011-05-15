@@ -327,9 +327,15 @@ class Remailer::Connection < EventMachine::Connection
     record = Socket.gethostbyname(hostname)
     
     # FIXME: IPv6 Support here
-    debug_notification(:resolved, record && record.last.unpack('CCCC').join('.'))
+    address = (record and record[3])
+    
+    if (address)
+      debug_notification(:resolver, "Address #{hostname} resolved as #{address.unpack('CCCC').join('.')}")
+    else
+      debug_notification(:resolver, "Address #{hostname} could not be resolved")
+    end
 
-    record and record.last
+    address
   rescue
     nil
   end
