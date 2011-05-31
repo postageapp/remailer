@@ -121,11 +121,7 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
     interpret(220) do
       delegate.start_tls
       
-      if (delegate.requires_authentication?)
-        enter_state(:auth)
-      else
-        enter_state(:established)
-      end
+      enter_state(:helo)
     end
   end
 
