@@ -216,6 +216,8 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
     
     interpret(250) do
       if (delegate.active_message[:test])
+        delegate_call(:after_message_sent, reply_code, reply_message)
+
         enter_state(:reset)
       else
         enter_state(:data)
