@@ -214,10 +214,10 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
       end
     end
     
-    interpret(250) do |reply_code, reply_message, continued|
+    interpret(250) do |reply_message, continued|
       unless (continued)
         if (delegate.active_message[:test])
-          delegate_call(:after_message_sent, reply_code, reply_message)
+          delegate_call(:after_message_sent, 250, reply_message)
 
           enter_state(:reset)
         else
