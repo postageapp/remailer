@@ -251,8 +251,10 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
       delegate.send_line(".")
     end
     
-    default do |reply_code, reply_message|
-      delegate_call(:after_message_sent, reply_code, reply_message)
+    default do |reply_code, reply_message, continues|
+      handle_reply_continuation(reply_code, reply_message, continues) do |reply_code, reply_message|
+        delegate_call(:after_message_sent, reply_code, reply_message)
+      end
 
       enter_state(:sent)
     end
@@ -300,20 +302,38 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
     end
   end
   
-  on_error do |reply_code, reply_message|
-    delegate.message_callback(reply_code, reply_message)
-    delegate.debug_notification(:error, "[#{@state}] #{reply_code} #{reply_message}")
-    delegate.error_notification(reply_code, reply_message)
-    
-    delegate.active_message = nil
-    
-    enter_state(delegate.protocol ? :reset : :terminated)
+  on_error do |reply_code, reply_message, continues|
+    handle_reply_continuation(reply_code, reply_message, continues) do |reply_code, reply_message|
+      delegate.message_callback(reply_code, reply_message)
+      delegate.debug_notification(:error, "[#{@state}] #{reply_code} #{reply_message}")
+      delegate.error_notification(reply_code, reply_message)
+
+      delegate.active_message = nil
+
+      enter_state(delegate.protocol ? :reset : :terminated)
+    end
   end
 
   # == Instance Methods =====================================================
 
   def label
     'SMTP'
+  end
+  
+  def handle_reply_continuation(reply_code, reply_message, continues)
+    @reply_message ||= ''
+    
+    if (preamble = @reply_message.split(/\s/).first)
+      reply_message.sub!(/^#{preamble}/, '')
+    end
+    
+    @reply_message << reply_message.gsub(/\s+/, ' ')
+    
+    unless (continues)
+      yield(reply_code, @reply_message)
+
+      @reply_message = nil
+    end
   end
 
   def will_interpret?(proc, args)
