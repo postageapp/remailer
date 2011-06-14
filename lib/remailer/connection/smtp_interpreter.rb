@@ -134,20 +134,10 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
       enter_state(:established)
     end
     
-    interpret(535) do |message, continues|
-      if (@error)
-        @error << ' '
-        
-        if (message.match(/^(\S+)/).to_s == @error.match(/^(\S+)/).to_s)
-          @error << message.sub(/^\S+/, '')
-        else
-          @error << message
-        end
-      else
+    interpret(535) do |reply_message, continues|
+      handle_reply_continuation(535, reply_message, continues) do |reply_code, reply_message|
         @error = message
-      end
 
-      unless (continues)
         enter_state(:quit)
       end
     end
@@ -214,15 +204,23 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
       end
     end
     
-    interpret(250) do |reply_message, continued|
-      unless (continued)
+    interpret(250) do |reply_message, continues|
+      handle_reply_continuation(250, reply_message, continues) do |reply_code, reply_message|
         if (delegate.active_message[:test])
-          delegate_call(:after_message_sent, 250, reply_message)
+          delegate_call(:after_message_sent, reply_code, reply_message)
 
           enter_state(:reset)
         else
           enter_state(:data)
         end
+      end
+    end
+    
+    interpret(500..599) do |reply_code, reply_message, continues|
+      handle_reply_continuation(reply_code, reply_message, continues) do |reply_code, reply_message|
+        delegate_call(:after_message_sent, reply_code, reply_message)
+
+        enter_state(:reset)
       end
     end
   end

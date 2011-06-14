@@ -231,6 +231,8 @@ class Remailer::Interpreter
         case (response)
         when Regexp
           match_result = response.match(object)
+        when Range
+          response.include?(object)
         else
           response === object
         end
@@ -249,6 +251,8 @@ class Remailer::Interpreter
           end
         when String
           args[0].sub!(matched, '')
+        when Range
+          # Keep as-is
         else
           args.shift
         end
