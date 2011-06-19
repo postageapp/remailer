@@ -264,6 +264,8 @@ class Remailer::Connection < EventMachine::Connection
   # This implements the EventMachine::Connection#unbind method to capture
   # a connection closed event.
   def unbind
+    return if (@unbound)
+    
     @connected = false
     @unbound = true
     @interpreter = nil
@@ -271,6 +273,7 @@ class Remailer::Connection < EventMachine::Connection
     if (@active_message)
       if (callback = @active_message[:callback])
         callback.call(nil)
+        @active_message = nil
       end
     end
     
@@ -421,6 +424,8 @@ class Remailer::Connection < EventMachine::Connection
 
   # EventMachine: Closes down the connection.
   def close_connection
+    return if (@closed)
+
     send_callback(:on_disconnect)
     debug_notification(:closed, "Connection closed")
     super
