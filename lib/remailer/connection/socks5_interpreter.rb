@@ -82,9 +82,10 @@ class Remailer::Connection::Socks5Interpreter < Remailer::Interpreter
   
   state :resolving_destination do
     enter do
-      # FIX: Use an async resolver here
-      @destination_address = delegate.resolve_hostname(delegate.options[:host])
-      enter_state(:connect_through_proxy)
+      delegate.resolve_hostname(delegate.options[:host]) do |address|
+        @destination_address = address
+        enter_state(:connect_through_proxy)
+      end
     end
   end
   

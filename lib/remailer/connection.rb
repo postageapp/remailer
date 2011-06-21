@@ -77,9 +77,28 @@ class Remailer::Connection < EventMachine::Connection
       host_port = proxy_options[:port] || SOCKS5_PORT
     end
 
+    establish!(host_name, host_port, options)
+  end
+
+  # Warns about supplying a Proc which does not appear to accept the required
+  # number of arguments.
+  def self.warn_about_arguments(proc, range)
+    unless (range.include?(proc.arity) or proc.arity == -1)
+      STDERR.puts "Callback must accept #{[ range.min, range.max ].uniq.join(' to ')} arguments but accepts #{proc.arity}"
+    end
+  end
+  
+  def self.establish!(host_name, host_port, options)
     EventMachine.connect(host_name, host_port, self, options)
 
   rescue EventMachine::ConnectionError => e
+    report_exception(e, options)
+
+    false
+  end
+
+  # Handles callbacks driven by exceptions before an instance could be created.
+  def self.report_exception(e)
     case (options[:connect])
     when Proc
       options[:connect].call(false, e.to_s)
@@ -111,14 +130,6 @@ class Remailer::Connection < EventMachine::Connection
     false
   end
   
-  # Warns about supplying a Proc which does not appear to accept the required
-  # number of arguments.
-  def self.warn_about_arguments(proc, range)
-    unless (range.include?(proc.arity) or proc.arity == -1)
-      STDERR.puts "Callback must accept #{[ range.min, range.max ].uniq.join(' to ')} arguments but accepts #{proc.arity}"
-    end
-  end
-
   # == Instance Methods =====================================================
   
   # EventMachine will call this constructor and it is not to be called
@@ -336,8 +347,6 @@ class Remailer::Connection < EventMachine::Connection
   end
 
   def resolve_hostname(hostname)
-    # FIXME: Elminitate this potentially blocking call by using an async
-    #        resolver if available.
     record = Socket.gethostbyname(hostname)
     
     # FIXME: IPv6 Support here
@@ -348,6 +357,8 @@ class Remailer::Connection < EventMachine::Connection
     else
       debug_notification(:resolver, "Address #{hostname} could not be resolved")
     end
+    
+    yield(address) if (block_given?)
 
     address
   rescue
