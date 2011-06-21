@@ -355,6 +355,12 @@ class Remailer::Connection < EventMachine::Connection
     @timeout_at = Time.now + @timeout
   end
   
+  # Returns the number of seconds remaining until a timeout will occur, or
+  # nil if no time-out is pending.
+  def time_remaning
+    @timeout_at and (@timeout_at.to_i - Time.now.to_i)
+  end
+  
   # Checks for a timeout condition, and if one is detected, will close the
   # connection and send appropriate callbacks.
   def check_for_timeouts!
@@ -426,13 +432,18 @@ class Remailer::Connection < EventMachine::Connection
   def close_connection
     return if (@closed)
 
-    send_callback(:on_disconnect)
+    unless (@timed_out)
+      send_callback(:on_disconnect)
+    end
+
     debug_notification(:closed, "Connection closed")
+    
     super
 
     @connected = false
     @closed = true
     @timeout_at = nil
+    @interpreter = nil
   end
   alias_method :close, :close_connection
 
