@@ -308,7 +308,7 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
 
       delegate.active_message = nil
 
-      enter_state(delegate.protocol ? :reset : :terminated)
+      enter_state(@state == :initialized ? :terminated : :reset)
     end
   end
 
