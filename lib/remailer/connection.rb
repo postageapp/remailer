@@ -294,9 +294,9 @@ class Remailer::Connection < EventMachine::Connection
     @buffer ||= ''
     @buffer << data
 
-    if (@interpreter)
-      @interpreter.process(@buffer) do |reply|
-        debug_notification(:receive, "[#{@interpreter.label}] #{reply.inspect}")
+    if (interpreter = @interpreter)
+      interpreter.process(@buffer) do |reply|
+        debug_notification(:receive, "[#{interpreter.label}] #{reply.inspect}")
       end
     else
       error_notification(:out_of_band, "Receiving data before a protocol has been established.")
@@ -318,7 +318,11 @@ class Remailer::Connection < EventMachine::Connection
   # Returns the current state of the active interpreter, or nil if no state
   # is assigned.
   def state
-    @interpreter and @interpreter.state
+    if (interpreter = @interpreter)
+      @interpreter.state
+    else
+      nil
+    end
   end
 
   # Sends a single line to the remote host with the appropriate CR+LF
@@ -384,8 +388,8 @@ class Remailer::Connection < EventMachine::Connection
       
       message = "Timed out before a connection could be established to #{remote_options[:host]}:#{remote_options[:port]}"
       
-      if (@interpreter)
-        message << " using #{@interpreter.label}"
+      if (interpreter = @interpreter)
+        message << " using #{interpreter.label}"
       end
       
       connect_notification(false, message)
@@ -522,7 +526,9 @@ class Remailer::Connection < EventMachine::Connection
   end
 
   def message_callback(reply_code, reply_message)
-    if (callback = (@active_message and @active_message[:callback]))
+    active_message = @active_message
+    
+    if (callback = (active_message and active_message[:callback]))
       # The callback is screened in advance when assigned to ensure that it
       # has only 1 or 2 arguments. There should be no else here.
       case (callback.arity)
