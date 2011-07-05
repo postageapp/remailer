@@ -522,7 +522,11 @@ class Remailer::Connection < EventMachine::Connection
     @connected = code
 
     send_notification(:connect, code, message || self.remote)
-    send_callback(:on_connect) if (code)
+    
+    if (code)
+      send_callback(:on_connect)
+      @timeout_at = nil
+    end
   end
 
   def error_notification(code, message)
