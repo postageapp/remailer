@@ -8,7 +8,7 @@ Gem::Specification.new do |s|
   s.version = "0.4.11"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
-  s.authors = [%q{Scott Tadman}]
+  s.authors = ["Scott Tadman"]
   s.date = %q{2011-07-05}
   s.description = %q{EventMachine SMTP Mail User Agent}
   s.email = %q{scott@twg.ca}
@@ -37,8 +37,8 @@ Gem::Specification.new do |s|
     "test/unit/remailer_test.rb"
   ]
   s.homepage = %q{http://github.com/twg/remailer}
-  s.require_paths = [%q{lib}]
-  s.rubygems_version = %q{1.8.5}
+  s.require_paths = ["lib"]
+  s.rubygems_version = %q{1.5.3}
   s.summary = %q{Reactor-Ready SMTP Mailer}
   s.test_files = [
     "test/config.example.rb",

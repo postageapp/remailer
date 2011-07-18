@@ -36,12 +36,6 @@ class Remailer::Connection::Socks5Interpreter < Remailer::Interpreter
 
   state :initialized do
     enter do
-      enter_state(:connect_to_proxy)
-    end
-  end
-  
-  state :connect_to_proxy do
-    enter do
       proxy_options = delegate.options[:proxy]
 
       socks_methods = [ ]
@@ -91,6 +85,8 @@ class Remailer::Connection::Socks5Interpreter < Remailer::Interpreter
   
   state :connect_through_proxy do
     enter do
+      delegate.proxy_connection_initiated
+      
       if (@destination_address)
         delegate.debug_notification(:proxy, "Sending proxy connection request to #{@destination_address.unpack('CCCC').join('.')}:#{delegate.options[:port]}")
 

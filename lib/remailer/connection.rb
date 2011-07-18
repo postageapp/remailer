@@ -159,6 +159,7 @@ class Remailer::Connection < EventMachine::Connection
     reset_timeout!
 
     if (using_proxy?)
+      @connecting_to_proxy = true
       use_socks5_interpreter!
     else
       use_smtp_interpreter!
@@ -266,28 +267,41 @@ class Remailer::Connection < EventMachine::Connection
     @timeout = DEFAULT_TIMEOUT if (@timeout <= 0)
   end
   
+  def proxy_connection_initiated
+    @connecting_to_proxy = false
+  end
+  
   # This implements the EventMachine::Connection#completed method by
   # flagging the connection as estasblished.
   def connection_completed
-    @timeout_at = nil
+    reset_timeout!
   end
   
   # This implements the EventMachine::Connection#unbind method to capture
   # a connection closed event.
   def unbind
     return if (@unbound)
-    
-    @connected = false
-    @unbound = true
-    @interpreter = nil
 
+    @unbound = true
+    
     if (@active_message)
+      debug_notification(:disconnect, "Disconnected by remote before transaction could be completed.")
+
       if (callback = @active_message[:callback])
         callback.call(nil)
+
         @active_message = nil
       end
+    elsif (@closed)
+      debug_notification(:disconnect, "Disconnected from remote.")
+    else
+      debug_notification(:disconnect, "Disconnected by remote while connection was idle.")
     end
-    
+
+    @connected = false
+    @timeout_at = nil
+    @interpreter = nil
+
     send_callback(:on_disconnect)
   end
   
@@ -391,15 +405,15 @@ class Remailer::Connection < EventMachine::Connection
       send_callback(:on_error)
     elsif (!@connected)
       remote_options = @options
+      interpreter = @interpreter
       
-      case (@interpreter)
-      when Remailer::Connection::Socks5Interpreter
+      if (@connecting_to_proxy)
         remote_options = @options[:proxy]
       end
       
       message = "Timed out before a connection could be established to #{remote_options[:host]}:#{remote_options[:port]}"
       
-      if (interpreter = @interpreter)
+      if (interpreter)
         message << " using #{interpreter.label}"
       end
       
@@ -525,7 +539,6 @@ class Remailer::Connection < EventMachine::Connection
     
     if (code)
       send_callback(:on_connect)
-      @timeout_at = nil
     end
   end
 
