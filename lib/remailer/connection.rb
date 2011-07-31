@@ -98,7 +98,7 @@ class Remailer::Connection < EventMachine::Connection
   end
 
   # Handles callbacks driven by exceptions before an instance could be created.
-  def self.report_exception(e)
+  def self.report_exception(e, options)
     case (options[:connect])
     when Proc
       options[:connect].call(false, e.to_s)
