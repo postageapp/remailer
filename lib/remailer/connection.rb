@@ -423,7 +423,13 @@ class Remailer::Connection < EventMachine::Connection
 
       send_callback(:on_error)
     else
-      send_callback(:on_disconnect)
+      interpreter = @interpreter
+
+      if (interpreter and interpreter.respond_to?(:close))
+        interpreter.close
+      else
+        send_callback(:on_disconnect)
+      end
     end
 
     close_connection

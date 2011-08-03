@@ -318,6 +318,12 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
     'SMTP'
   end
   
+  def close
+    if (@state == :ready)
+      enter_state(:quit)
+    end
+  end
+  
   def handle_reply_continuation(reply_code, reply_message, continues)
     @reply_message ||= ''
     
