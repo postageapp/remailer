@@ -294,6 +294,8 @@ class Remailer::Connection < EventMachine::Connection
       end
     elsif (@closed)
       debug_notification(:disconnect, "Disconnected from remote.")
+    elsif (!@established)
+      error_notification(:hangup, "Disconnected from remote before fully established.")
     else
       debug_notification(:disconnect, "Disconnected by remote while connection was idle.")
     end
@@ -499,6 +501,8 @@ class Remailer::Connection < EventMachine::Connection
 
   def after_ready
     return if (@active_message)
+    
+    @established = true
     
     reset_timeout!
     
