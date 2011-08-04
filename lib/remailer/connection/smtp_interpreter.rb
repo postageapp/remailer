@@ -155,6 +155,11 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
     enter do
       delegate.after_ready
     end
+    
+    interpret(400..499) do
+      # Messages like this might indicate a connection time-out, not an
+      # actual error.
+    end
   end
   
   state :send do
