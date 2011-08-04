@@ -136,7 +136,7 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
     
     interpret(535) do |reply_message, continues|
       handle_reply_continuation(535, reply_message, continues) do |reply_code, reply_message|
-        @error = message
+        @error = reply_message
 
         enter_state(:quit)
       end
