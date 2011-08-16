@@ -194,6 +194,11 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
       delegate.send_line("HELO #{delegate.hostname}")
     end
     
+    interpret(220) do
+      # "HELO/EHLO command already issued"
+      enter_state(:mail_from)
+    end
+    
     interpret(250) do
       enter_state(:mail_from)
     end
