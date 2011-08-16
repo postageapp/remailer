@@ -121,7 +121,7 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
     interpret(220) do
       delegate.start_tls
       
-      enter_state(:helo)
+      enter_state(:re_helo)
     end
   end
 
