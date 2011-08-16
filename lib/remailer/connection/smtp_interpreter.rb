@@ -196,11 +196,11 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
     
     interpret(220) do
       # "HELO/EHLO command already issued"
-      enter_state(:mail_from)
+      enter_state(:established)
     end
     
     interpret(250) do
-      enter_state(:mail_from)
+      enter_state(:established)
     end
   end
   
