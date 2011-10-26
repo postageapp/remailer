@@ -4,14 +4,14 @@
 # -*- encoding: utf-8 -*-
 
 Gem::Specification.new do |s|
-  s.name = "remailer"
+  s.name = %q{remailer}
   s.version = "0.4.19"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
-  s.authors = ["Scott Tadman"]
-  s.date = "2011-10-19"
-  s.description = "EventMachine SMTP Mail User Agent"
-  s.email = "scott@twg.ca"
+  s.authors = [%q{Scott Tadman}]
+  s.date = %q{2011-10-26}
+  s.description = %q{EventMachine SMTP Mail User Agent}
+  s.email = %q{scott@twg.ca}
   s.extra_rdoc_files = [
     "README.rdoc"
   ]
@@ -36,10 +36,10 @@ Gem::Specification.new do |s|
     "test/unit/remailer_interpreter_test.rb",
     "test/unit/remailer_test.rb"
   ]
-  s.homepage = "http://github.com/twg/remailer"
-  s.require_paths = ["lib"]
-  s.rubygems_version = "1.8.10"
-  s.summary = "Reactor-Ready SMTP Mailer"
+  s.homepage = %q{http://github.com/twg/remailer}
+  s.require_paths = [%q{lib}]
+  s.rubygems_version = %q{1.8.8}
+  s.summary = %q{Reactor-Ready SMTP Mailer}
 
   if s.respond_to? :specification_version then
     s.specification_version = 3

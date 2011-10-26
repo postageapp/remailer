@@ -27,7 +27,7 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
 
   # Encodes a string in Base64 as a single line
   def self.base64(string)
-    [ string.to_s ].pack('m').chomp
+    [ string.to_s ].pack('m').gsub(/\n/, '')
   end
   
   # == State Mapping ========================================================
@@ -102,7 +102,7 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
       end
 
       unless (continues)
-        if (delegate.use_tls? and delegate.tls_support?)
+        if (delegate.use_tls? and delegate.tls_support? and !@tls)
           enter_state(:starttls)
         elsif (delegate.requires_authentication?)
           enter_state(:auth)
@@ -110,6 +110,20 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
           enter_state(:established)
         end
       end
+    end
+    
+    interpret(502) do
+      # Non-compliant ESTMP server
+      # "502 5.5.2 Error: command not recognized"
+      delegate.protocol = :smtp
+      enter_state(:helo)
+    end
+
+    interpret(503) do
+      # Non-compliant ESTMP server
+      # "503 Bad sequence of commands"
+      delegate.protocol = :smtp
+      enter_state(:helo)
     end
   end
   
@@ -120,8 +134,14 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
     
     interpret(220) do
       delegate.start_tls
+      @tls = true
       
-      enter_state(:re_helo)
+      case (delegate.protocol)
+      when :esmtp
+        enter_state(:ehlo)
+      else
+        enter_state(:helo)
+      end
     end
   end
 
@@ -195,9 +215,10 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
     end
     
     interpret(220) do
-      # "HELO/EHLO command already issued"
       if (delegate.requires_authentication?)
         enter_state(:auth)
+      elsif (delegate.active_message)
+        enter_state(:mail_from)
       else
         enter_state(:established)
       end
@@ -288,6 +309,11 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
     end
     
     interpret(221) do
+      enter_state(:terminated)
+    end
+    
+    interpret(502) do
+      # "502 5.5.2 Error: command not recognized"
       enter_state(:terminated)
     end
   end
