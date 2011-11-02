@@ -111,6 +111,12 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
         end
       end
     end
+    
+    interpret(500..599) do |result_code|
+      # RFC1869 suggests trying HELO if EHLO results in some kind of error,
+      # typically 5xx, but the actual code varies wildly depending on server.
+      enter_state(:helo)
+    end
   end
   
   state :starttls do
