@@ -151,6 +151,9 @@ class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
       handle_reply_continuation(535, reply_message, continues) do |reply_code, reply_message|
         @error = reply_message
 
+        delegate.debug_notification(:error, "[#{@state}] #{reply_code} #{reply_message}")
+        delegate.error_notification(reply_code, reply_message)
+
         enter_state(:quit)
       end
     end
