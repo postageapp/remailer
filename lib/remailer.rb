@@ -1,6 +1,7 @@
 module Remailer
   # == Submodules ===========================================================
   
-  autoload(:Connection, 'remailer/connection')
+  autoload(:SMTP, 'remailer/smtp')
+  autoload(:IMAP, 'remailer/imap')
   autoload(:Interpreter, 'remailer/interpreter')
 end

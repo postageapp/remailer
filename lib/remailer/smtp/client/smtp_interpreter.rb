@@ -1,4 +1,4 @@
-class Remailer::Connection::SmtpInterpreter < Remailer::Interpreter
+class Remailer::SMTP::Client::SMTPInterpreter < Remailer::Interpreter
   # == Constants ============================================================
 
   LINE_REGEXP = /^.*?\r?\n/.freeze

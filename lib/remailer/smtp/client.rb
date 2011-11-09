@@ -1,15 +1,15 @@
 require 'socket'
 require 'eventmachine'
 
-class Remailer::Connection < EventMachine::Connection
+class Remailer::SMTP::Client < EventMachine::Connection
   # == Exceptions ===========================================================
   
   class CallbackArgumentsRequired < Exception; end
 
   # == Submodules ===========================================================
   
-  autoload(:SmtpInterpreter, 'remailer/connection/smtp_interpreter')
-  autoload(:Socks5Interpreter, 'remailer/connection/socks5_interpreter')
+  autoload(:SMTPInterpreter, 'remailer/smtp/client/smtp_interpreter')
+  autoload(:SOCKS5Interpreter, 'remailer/smtp/client/socks5_interpreter')
 
   # == Constants ============================================================
   
@@ -486,12 +486,12 @@ class Remailer::Connection < EventMachine::Connection
 
   # Switches to use the SOCKS5 interpreter for all subsequent communication
   def use_socks5_interpreter!
-    @interpreter = Remailer::Connection::Socks5Interpreter.new(:delegate => self)
+    @interpreter = SOCKS5Interpreter.new(:delegate => self)
   end
 
   # Switches to use the SMTP interpreter for all subsequent communication
   def use_smtp_interpreter!
-    @interpreter = Remailer::Connection::SmtpInterpreter.new(:delegate => self)
+    @interpreter = SMTPInterpreter.new(:delegate => self)
   end
 
   # Callback receiver for when the proxy connection has been completed.
