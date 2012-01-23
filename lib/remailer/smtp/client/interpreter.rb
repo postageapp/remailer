@@ -1,7 +1,7 @@
-class Remailer::SMTP::Client::SMTPInterpreter < Remailer::Interpreter
+class Remailer::SMTP::Client::Interpreter < Remailer::Interpreter
   # == Constants ============================================================
-
-  LINE_REGEXP = /^.*?\r?\n/.freeze
+  
+  include Remailer::Constants
 
   # == Properties ===========================================================
 
@@ -10,7 +10,7 @@ class Remailer::SMTP::Client::SMTPInterpreter < Remailer::Interpreter
   # Expands a standard SMTP reply into three parts: Numerical code, message
   # and a boolean indicating if this reply is continued on a subsequent line.
   def self.split_reply(reply)
-    reply.match(/(\d+)([ \-])(.*)/) and [ $1.to_i, $3, $2 == '-' ? :continued : nil ].compact
+    reply.match(/^(\d+)([ \-])(.*)/) and [ $1.to_i, $3, $2 == '-' ? :continued : nil ].compact
   end
 
   # Encodes the given user authentication paramters as a Base64-encoded

@@ -303,7 +303,7 @@ class RemailerSMTPClientSMTPInterpreterTest < Test::Unit::TestCase
     interpreter.process("220 TLS go ahead\r\n")
     assert_equal true, delegate.started_tls?
     
-    assert_equal :ready, interpreter.state
+    assert_equal :ehlo, interpreter.state
   end
 
   def test_tls_connection_without_support

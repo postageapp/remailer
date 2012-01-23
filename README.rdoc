@@ -6,50 +6,50 @@ Reactor-Ready Mailer Engine
 
 This is an EventMachine Connection implementation of a high-performance
 asynchronous SMTP client. Although EventMachine ships with a built-in SMTP
-client, that version is limited to sending a single email per connection,
-and since establishing a connection can be the majority of the time required
+client, that version is limited to sending a single email per client,
+and since establishing a client can be the majority of the time required
 to send email, this limits throughput considerably.
 
 == Use
 
 The Remailer system consists of the Remailer::Connection class which works
-within the EventMachine environment. To use it, create a connection and then
+within the EventMachine environment. To use it, create a client and then
 make one or more requests to send email messages.
 
     EventMachine.run do
-      # Establish a connection to a particular SMTP server and send debugging
+      # Establish a client to a particular SMTP server and send debugging
       # messages to STDERR.
-      connection = Remailer::Connection.open(
+      client = Remailer::SMTP::Client.open(
         'smtp.google.com',
         :debug => STDERR
       )
       
-      # Send a single email message through the connection at the earliest
-      # opportunity. Note that the connection will need to be fully
+      # Send a single email message through the client at the earliest
+      # opportunity. Note that the client will need to be fully
       # established first and this may take upwards of ten seconds.
-      connection.send_email(
+      client.send_email(
         'from@example.net',
         'to@example.com',
         email_content
       )
 
-      # Send an additional message through the connection. This will queue up
+      # Send an additional message through the client. This will queue up
       # until the first has been transmitted.
-      connection.send_email(
+      client.send_email(
         'from@example.net',
         'to@example.com',
         email_content
       )
       
-      # Tells the connection to close out when finished.
-      connection.close_when_complete!
+      # Tells the client to close out when finished.
+      client.close_when_complete!
     end
 
 A Proc can be supplied as the :debug option to Remailer::Connection.open and
 in this case it will be called with two parameters, type and message. An
 example is given here where the information is simply dumped on STDOUT:
 
-    connection = Remailer::Connection.open(
+    client = Remailer::SMTP::Client.open(
       'smtp.google.com',
       :debug => lambda { |type, message|
         puts "#{type}> #{message.inspect}"
@@ -62,17 +62,17 @@ The types defined include:
   * :reply - Raw replies from the server
   * :options - The finalized options used to connect to the server
 
-This callback procedure can be defined or replaced after the connection is
+This callback procedure can be defined or replaced after the client is
 initialized:
 
-    connection.debug do |type, message|
+    client.debug do |type, message|
       STDERR.puts "%s> %s" % [ type, message.inspect ]
     end
     
 It's also possible to define a handler for when the message queue has been
 exhausted:
 
-    connection.after_complete do
+    client.after_complete do
       STDERR.puts "Sending complete."
     end
 
@@ -80,7 +80,7 @@ The call to send a message can also take a callback method which must receive
 one parameter that will be the numerical status code returned by the SMTP
 server. Success is defined as 250, errors vary:
 
-    connection.send_email(
+    client.send_email(
       'from@example.net',
       'to@example.com',
       email_content
@@ -89,6 +89,12 @@ server. Success is defined as 250, errors vary:
     end
 
 A status code of nil is sent if the server timed out or the connection failed.
+
+== Tests
+
+In order to run tests, copy `test/config.example.rb` to `test/config.rb` and
+adjust as required. For obvious reasons, passwords to SMTP test accounts are
+not included in the source code of this library.
 
 == Status
 

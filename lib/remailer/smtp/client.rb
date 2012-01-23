@@ -1,29 +1,16 @@
 require 'socket'
 require 'eventmachine'
 
-class Remailer::SMTP::Client < EventMachine::Connection
-  # == Exceptions ===========================================================
-  
-  class CallbackArgumentsRequired < Exception; end
-
+class Remailer::SMTP::Client < Remailer::AbstractConnection
   # == Submodules ===========================================================
   
-  autoload(:SMTPInterpreter, 'remailer/smtp/client/smtp_interpreter')
-  autoload(:SOCKS5Interpreter, 'remailer/smtp/client/socks5_interpreter')
+  autoload(:Interpreter, 'remailer/smtp/client/interpreter')
 
   # == Constants ============================================================
   
-  CRLF = "\r\n".freeze
-  DEFAULT_TIMEOUT = 5
-
-  SMTP_PORT = 25
-  SOCKS5_PORT = 1080
+  include Remailer::Constants
   
-  NOTIFICATIONS = [
-    :debug,
-    :error,
-    :connect
-  ].freeze
+  DEFAULT_TIMEOUT = 5
   
   # == Properties ===========================================================
   
@@ -39,6 +26,14 @@ class Remailer::SMTP::Client < EventMachine::Connection
   include EventMachine::Deferrable
 
   # == Class Methods ========================================================
+
+  def self.default_timeout
+    DEFAULT_TIMEOUT
+  end
+  
+  def self.default_port
+    SMTP_PORT
+  end
 
   # Opens a connection to a specific SMTP server. Options can be specified:
   # * port => Numerical port number (default is 25)
@@ -57,155 +52,23 @@ class Remailer::SMTP::Client < EventMachine::Connection
   # option. The block will recieve a first argument that is the status of
   # the connection, and an optional second that is a diagnostic message.
   def self.open(smtp_server, options = nil, &block)
-    options ||= { }
-    options[:host] = smtp_server
-    options[:port] ||= 25
-
-    unless (options.key?(:use_tls))
-      options[:use_tls] = true
-    end
-
-    if (block_given?)
-      options[:connect] = block
-    end
-    
-    host_name = smtp_server
-    host_port = options[:port]
-    
-    if (proxy_options = options[:proxy])
-      host_name = proxy_options[:host]
-      host_port = proxy_options[:port] || SOCKS5_PORT
-    end
-
-    establish!(host_name, host_port, options)
-  end
-
-  # Warns about supplying a Proc which does not appear to accept the required
-  # number of arguments.
-  def self.warn_about_arguments(proc, range)
-    unless (range.include?(proc.arity) or proc.arity == -1)
-      STDERR.puts "Callback must accept #{[ range.min, range.max ].uniq.join(' to ')} arguments but accepts #{proc.arity}"
-    end
-  end
-  
-  def self.establish!(host_name, host_port, options)
-    EventMachine.connect(host_name, host_port, self, options)
-
-  rescue EventMachine::ConnectionError => e
-    report_exception(e, options)
-
-    false
-  end
-
-  # Handles callbacks driven by exceptions before an instance could be created.
-  def self.report_exception(e, options)
-    case (options[:connect])
-    when Proc
-      options[:connect].call(false, e.to_s)
-    when IO
-      options[:connect].puts(e.to_s)
-    end
-    
-    case (options[:on_error])
-    when Proc
-      options[:on_error].call(e.to_s)
-    when IO
-      options[:on_error].puts(e.to_s)
-    end
-
-    case (options[:debug])
-    when Proc
-      options[:debug].call(:error, e.to_s)
-    when IO
-      options[:debug].puts(e.to_s)
-    end
-    
-    case (options[:error])
-    when Proc
-      options[:error].call(:connect_error, e.to_s)
-    when IO
-      options[:error].puts(e.to_s)
-    end
-    
-    false
+    super(smtp_server, options, &block)
   end
   
   # == Instance Methods =====================================================
-  
-  # EventMachine will call this constructor and it is not to be called
-  # directly. Use the Remailer::Connection.open method to facilitate the
-  # correct creation of a new connection.
-  def initialize(options)
-    # Throwing exceptions inside this block is going to cause EventMachine
-    # to malfunction in a spectacular way and hide the actual exception. To
-    # allow for debugging, exceptions are dumped to STDERR as a last resort.
-    @options = options
-    @hostname = @options[:hostname] || Socket.gethostname
-    @timeout = @options[:timeout] || DEFAULT_TIMEOUT
+
+  # Called by AbstractConnection at the end of the initialize procedure
+  def after_initialize
     @protocol = :smtp
 
-    @messages = [ ]
-  
-    NOTIFICATIONS.each do |type|
-      callback = @options[type]
-
-      if (callback.is_a?(Proc))
-        self.class.warn_about_arguments(callback, (2..2))
-      end
-    end
-  
-    debug_notification(:options, @options.inspect)
-  
-    reset_timeout!
-
     if (using_proxy?)
-      @connecting_to_proxy = true
+      proxy_connection_initiated!
       use_socks5_interpreter!
     else
       use_smtp_interpreter!
     end
-    
-  rescue Object => e
-    STDERR.puts "#{e.class}: #{e}"
-  end
-  
-  # Returns true if the connection requires TLS support, or false otherwise.
-  def use_tls?
-    !!@options[:use_tls]
-  end
-  
-  # Returns true if the connection has advertised TLS support, or false if
-  # not availble or could not be detected. This will only work with ESMTP
-  # capable servers.
-  def tls_support?
-    !!@tls_support
   end
 
-  # Returns true if the connection has advertised authentication support, or
-  # false if not availble or could not be detected. This will only work with
-  # ESMTP capable servers.
-  def auth_support?
-    !!@auth_support
-  end
-  
-  # Returns true if the connection will be using a proxy to connect, false
-  # otherwise.
-  def using_proxy?
-    !!@options[:proxy]
-  end
-  
-  # Returns true if the connection will require authentication to complete,
-  # that is a username has been supplied in the options, or false otherwise.
-  def requires_authentication?
-    @options[:username] and !@options[:username].empty?
-  end
-
-  # This is used to create a callback that will be called if no more messages
-  # are schedueld to be sent.
-  def after_complete(&block)
-    @options[:after_complete] = block
-  end
-  
   # Closes the connection after all of the queued messages have been sent.
   def close_when_complete!
     @options[:close] = true
@@ -260,30 +123,7 @@ class Remailer::SMTP::Client < EventMachine::Connection
     end
   end
   
-  # Reassigns the timeout which is specified in seconds. Values equal to
-  # or less than zero are ignored and a default is used instead.
-  def timeout=(value)
-    @timeout = value.to_i
-    @timeout = DEFAULT_TIMEOUT if (@timeout <= 0)
-  end
-  
-  def proxy_connection_initiated
-    @connecting_to_proxy = false
-  end
-  
-  # This implements the EventMachine::Connection#completed method by
-  # flagging the connection as estasblished.
-  def connection_completed
-    reset_timeout!
-  end
-  
-  # This implements the EventMachine::Connection#unbind method to capture
-  # a connection closed event.
-  def unbind
-    return if (@unbound)
-
-    @unbound = true
-    
+  def after_unbind
     if (@active_message)
       debug_notification(:disconnect, "Disconnected by remote before transaction could be completed.")
 
@@ -299,12 +139,6 @@ class Remailer::SMTP::Client < EventMachine::Connection
     else
       debug_notification(:disconnect, "Disconnected by remote while connection was idle.")
     end
-
-    @connected = false
-    @timeout_at = nil
-    @interpreter = nil
-
-    send_callback(:on_disconnect)
   end
   
   # Returns true if the connection has been unbound by EventMachine, false
@@ -409,7 +243,7 @@ class Remailer::SMTP::Client < EventMachine::Connection
       remote_options = @options
       interpreter = @interpreter
       
-      if (@connecting_to_proxy)
+      if (self.proxy_connection_initiated?)
         remote_options = @options[:proxy]
       end
       
@@ -459,36 +293,6 @@ class Remailer::SMTP::Client < EventMachine::Connection
     !!@error
   end
   
-  # EventMachine: Enables TLS support on the connection.
-  def start_tls
-    debug_notification(:tls, "Started")
-    super
-  end
-
-  # EventMachine: Closes down the connection.
-  def close_connection
-    return if (@closed)
-
-    unless (@timed_out)
-      send_callback(:on_disconnect)
-    end
-
-    debug_notification(:closed, "Connection closed")
-    
-    super
-
-    @connected = false
-    @closed = true
-    @timeout_at = nil
-    @interpreter = nil
-  end
-  alias_method :close, :close_connection
-
-  # Switches to use the SOCKS5 interpreter for all subsequent communication
-  def use_socks5_interpreter!
-    @interpreter = SOCKS5Interpreter.new(:delegate => self)
-  end
-
   # Switches to use the SMTP interpreter for all subsequent communication
   def use_smtp_interpreter!
     @interpreter = SMTPInterpreter.new(:delegate => self)
@@ -500,12 +304,10 @@ class Remailer::SMTP::Client < EventMachine::Connection
   end
 
   def after_ready
+    super
+    
     return if (@active_message)
-    
-    @established = true
-    
-    reset_timeout!
-    
+  
     if (@active_message = @messages.shift)
       if (@interpreter.state == :ready)
         @interpreter.enter_state(:send)
@@ -523,69 +325,5 @@ class Remailer::SMTP::Client < EventMachine::Connection
     message_callback(reply_code, reply_message)
 
     @active_message = nil
-  end
-  
-  def interpreter_entered_state(interpreter, state)
-    debug_notification(:state, "#{interpreter.label.downcase}=#{state}")
-  end
-
-  def send_notification(type, code, message)
-    case (callback = @options[type])
-    when nil, false
-      # No notification in this case
-    when Proc
-      callback.call(code, message)
-    when IO
-      callback.puts("%s: %s" % [ code.to_s, message ])
-    else
-      STDERR.puts("%s: %s" % [ code.to_s, message ])
-    end
-  end
-  
-  def connect_notification(code, message = nil)
-    @connected = code
-
-    send_notification(:connect, code, message || self.remote)
-    
-    if (code)
-      send_callback(:on_connect)
-    end
-  end
-
-  def error_notification(code, message)
-    @error = code
-    @error_message = message
-
-    send_notification(:error, code, message)
-  end
-
-  def debug_notification(code, message)
-    send_notification(:debug, code, message)
-  end
-
-  def message_callback(reply_code, reply_message)
-    active_message = @active_message
-    
-    if (callback = (active_message and active_message[:callback]))
-      # The callback is screened in advance when assigned to ensure that it
-      # has only 1 or 2 arguments. There should be no else here.
-      case (callback.arity)
-      when 2
-        callback.call(reply_code, reply_message)
-      when 1
-        callback.call(reply_code)
-      end
-    end
-  end
-  
-  def send_callback(type)
-    if (callback = @options[type])
-      case (callback.arity)
-      when 1
-        callback.call(self)
-      else
-        callback.call
-      end
-    end
   end
 end

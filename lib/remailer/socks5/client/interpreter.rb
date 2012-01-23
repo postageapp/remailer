@@ -1,6 +1,7 @@
-class Remailer::SMTP::Client::SOCKS5Interpreter < Remailer::Interpreter
+class Remailer::SOCKS5::Client::Interpreter < Remailer::Interpreter
   # == Constants ============================================================
 
+  # RFC1928 and RFC1929 define these values
   SOCKS5_VERSION = 5
 
   SOCKS5_METHOD = {
@@ -44,7 +45,7 @@ class Remailer::SMTP::Client::SOCKS5Interpreter < Remailer::Interpreter
         socks_methods << SOCKS5_METHOD[:username_password]
       end
       
-      proxy_options[:port] ||= Remailer::SMTP::Client::SOCKS5_PORT
+      proxy_options[:port] ||= Remailer::Constants::SOCKS5_PORT
 
       delegate.debug_notification(:proxy, "Initiating proxy connection through #{proxy_options[:host]}:#{proxy_options[:port]}")
 

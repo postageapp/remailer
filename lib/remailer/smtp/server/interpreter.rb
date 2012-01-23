@@ -1,0 +1,239 @@
+class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
+  # == State Definitions ====================================================
+  
+  default do |error|
+    delegate.send_line("500 Invalid command")
+  end
+  
+  state :initialized do
+    enter do
+      delegate.send_line("220 #{delegate.server_name} PostageApp ESMTP Server Ready")
+      
+      delegate.accepted_connection(self.pool)
+      
+      enter_state(:reset)
+    end
+  end
+  
+  state :reset do
+    enter do
+      @email = Birdbrain::Email.new
+      
+      enter_state(:ready)
+    end
+  end
+  
+  state :ready do
+    interpret(/^\s*EHLO\s+(\S+)\s*$/) do |remote_host|
+      delegate.validate_hostname(remote_host) do |valid|
+        if (valid)
+          Birdbrain.engine.logger.debug("#{delegate.remote_ip}:#{delegate.remote_port} to #{delegate.local_ip}:#{delegate.local_port} Accepting connection from #{remote_host}")
+          @remote_host = remote_host
+
+          delegate.send_line("250-#{delegate.server_name} Hello #{delegate.remote_host} [#{delegate.remote_ip}]")
+          delegate.send_line("250-AUTH PLAIN")
+          delegate.send_line("250-SIZE 35651584")
+          delegate.send_line("250-STARTTLS") if (delegate.tls?)
+          delegate.send_line("250 OK")
+        else
+          Birdbrain.engine.logger.debug("#{delegate.remote_ip}:#{delegate.remote_port} to #{delegate.local_ip}:#{delegate.local_port} Rejecting connection from #{remote_host} because of invalid FQDN")
+          delegate.send_line("504 Need fully qualified hostname")
+        end
+      end
+    end
+
+    interpret(/^\s*HELO\s+(\S+)\s*$/) do |remote_host|
+      delegate.validate_hostname(remote_host) do |valid|
+        if (valid)
+          Birdbrain.engine.logger.debug("#{delegate.remote_ip}:#{delegate.remote_port} to #{delegate.local_ip}:#{delegate.local_port} Accepting connection from #{remote_host}")
+          @remote_host = remote_host
+
+          delegate.send_line("250 #{delegate.server_name} Hello #{delegate.remote_host} [#{delegate.remote_ip}]")
+        else
+          Birdbrain.engine.logger.debug("#{delegate.remote_ip}:#{delegate.remote_port} to #{delegate.local_ip}:#{delegate.local_port} Rejecting connection from #{remote_host} because of invalid FQDN")
+          delegate.send_line("504 Need fully qualified hostname")
+        end
+      end
+    end
+    
+    interpret(/^\s*MAIL\s+FROM:\s*<([^>]+)>\s*/) do |address|
+      if (Birdbrain::EmailAddress.valid?(address))
+        accept, message = will_accept_sender(address)
+
+        if (accept)
+          @email.sender = address
+        end
+
+        delegate.send_line(message)
+      else
+        delegate.send_line("501 Email address is not valid")
+      end
+    end
+
+    interpret(/^\s*RCPT\s+TO:\s*<([^>]+)>\s*/) do |address|
+      if (@email.sender)
+        if (Birdbrain::EmailAddress.valid?(address))
+          accept, message = will_accept_recipient(address)
+
+          if (accept)
+            @email.recipients ||= [ ]
+            @email.recipients << address
+          end
+
+          delegate.send_line(message)
+        else
+          delegate.send_line("501 Email address is not valid")
+        end
+      else
+        delegate.send_line("503 Sender not specified")
+      end
+    end
+    
+    interpret(/^\s*AUTH\s+PLAIN\s+(.*)\s*$/) do |auth|
+      # 235 2.7.0 Authentication successful
+      delegate.send("235 whatever")
+    end
+
+    interpret(/^\s*AUTH\s+PLAIN\s*$/) do
+      # Multi-line authentication method
+      enter_state(:auth_plain)
+    end
+    
+    interpret(/^\s*STARTTLS\s*$/) do
+      if (@tls_started)
+        delegate.send_line("454 TLS already started")
+      elsif (delegate.tls?)
+        delegate.send_line("220 TLS ready to start")
+        delegate.start_tls(
+          :private_key_file => Birdbrain.private_key_path,
+          :cert_chain_file => Birdbrain.ssl_cert_path
+        )
+        
+        @tls_started = true
+      else
+        delegate.send_line("421 TLS not supported")
+      end
+    end
+    
+    interpret(/^\s*DATA\s*$/) do
+      if (@email.sender)
+      else
+        delegate.send_line("503 valid RCPT command must precede DATA")
+      end
+      
+      enter_state(:data)
+      delegate.send_line("354 Supply message data")
+    end
+
+    interpret(/^\s*NOOP\s*$/) do |remote_host|
+      delegate.send_line("250 OK")
+    end
+
+    interpret(/^\s*RSET\s*$/) do |remote_host|
+      delegate.send_line("250 Reset OK")
+      
+      enter_state(:reset)
+    end
+    
+    interpret(/^\s*QUIT\s*$/) do
+      delegate.send_line("221 #{delegate.server_name} closing connection")
+
+      delegate.close_connection(true)
+    end
+  end
+  
+  state :data do
+    interpret(/^\.$/) do
+      accept, message = will_accept_mail(@email)
+      
+      delegate.receive_message(@email, accept)
+      
+      delegate.send_line(message)
+
+      @email = Birdbrain::Email.new
+
+      enter_state(:ready)
+    end
+    
+    default do |line|
+      @email.data << (line + Birdbrain::SmtpServer::CRLF)
+    end
+  end
+  
+  state :auth_plain do
+    # Receive a single line of authentication
+    # ...
+  end
+  
+  state :reply do
+    enter do
+      # Random delay if required
+      delegate.send_line(@reply)
+    end
+    
+    default do
+      delegate.send_line("554 SMTP Synchronization Error")
+      enter_state(:ready)
+    end
+  end
+
+  state :timeout do
+    enter do
+      delegate.send_line("420 Too slow")
+
+      delegate.close_connection(true)
+    end
+  end
+
+  # == Instance Methods =====================================================
+
+  def enter_state(state)
+    self.reset_ttl!
+    
+    super(state)
+  end
+
+  def reset_ttl!
+    @timeout_at = Time.now + self.connection_ttl
+  end
+
+  def connection_ttl
+    10
+  end
+  
+  def ttl_expired?
+    @timeout_at ? (Time.now > @timeout_at) : false
+  end
+  
+  def check_for_timeout!
+    if (self.ttl_expired?)
+      enter_state(:timeout)
+    end
+  end
+
+  def pool
+    @pool || delegate.local_ip
+  end
+  
+  def pool=(value)
+    @pool = value
+  end
+  
+  def will_accept_sender(sender)
+    [ true, "250 Accepted" ]
+  end
+  
+  def will_accept_recipient(recipient)
+    [ true, "250 Accepted" ]
+  end
+  
+  def will_accept_mail(email)
+    [ true, "250 Accepted" ]
+  end
+  
+  # == Submodules ===========================================================
+  
+  Dir.glob(File.expand_path('persona/**/*.rb', File.dirname(__FILE__))).each do |file|
+    require file
+  end
+end

@@ -1,12 +1,12 @@
 require File.expand_path(File.join(*%w[ .. helper ]), File.dirname(__FILE__))
 
-class RemailerConnectionTest < Test::Unit::TestCase
+class RemailerSMTPClientTest < Test::Unit::TestCase
   def test_connect
     engine do
       debug = { }
       connected_host = nil
 
-      connection = Remailer::Connection.open(
+      connection = Remailer::SMTP::Client.open(
         TestConfig.smtp_server[:host],
         :debug => STDERR, 
         :connect => lambda { |success, host| connected_host = host }
@@ -43,7 +43,7 @@ class RemailerConnectionTest < Test::Unit::TestCase
       on_error = false
       on_connect = false
 
-      connection = Remailer::Connection.open(
+      connection = Remailer::SMTP::Client.open(
         'example.com',
         :debug => STDERR,
         :error => lambda { |code, message|
@@ -70,7 +70,7 @@ class RemailerConnectionTest < Test::Unit::TestCase
     engine do
       error_received = nil
 
-      connection = Remailer::Connection.open(
+      connection = Remailer::SMTP::Client.open(
         'invalid-example-domain--x.com',
         :debug => STDERR,
         :error => lambda { |code, message|
@@ -91,9 +91,9 @@ class RemailerConnectionTest < Test::Unit::TestCase
     engine do
       debug = { }
 
-      connection = Remailer::Connection.open(
+      connection = Remailer::SMTP::Client.open(
         TestConfig.public_smtp_server[:host],
-        :port => TestConfig.public_smtp_server[:port] || Remailer::Connection::SMTP_PORT,
+        :port => TestConfig.public_smtp_server[:port] || Remailer::SMTP::Client::SMTP_PORT,
         :debug => STDERR,
         :username => TestConfig.public_smtp_server[:username],
         :password => TestConfig.public_smtp_server[:password]
@@ -127,7 +127,7 @@ class RemailerConnectionTest < Test::Unit::TestCase
     engine do
       debug = { }
 
-      connection = Remailer::Connection.open(
+      connection = Remailer::SMTP::Client.open(
         TestConfig.smtp_server[:host],
         :debug => STDERR,
         :proxy => {
@@ -162,7 +162,7 @@ class RemailerConnectionTest < Test::Unit::TestCase
 
   def test_connect_and_send_after_start
     engine do
-      connection = Remailer::Connection.open(
+      connection = Remailer::SMTP::Client.open(
         TestConfig.smtp_server[:host],
         :debug => STDERR
       )
@@ -195,7 +195,7 @@ class RemailerConnectionTest < Test::Unit::TestCase
 
   def test_connect_and_send_dotted_message
     engine do
-      connection = Remailer::Connection.open(
+      connection = Remailer::SMTP::Client.open(
         TestConfig.smtp_server[:host],
         :debug => STDERR
       )
@@ -220,7 +220,7 @@ class RemailerConnectionTest < Test::Unit::TestCase
 
   def test_connect_and_send_multiple
     engine do
-      connection = Remailer::Connection.open(
+      connection = Remailer::SMTP::Client.open(
         TestConfig.smtp_server[:host],
         :debug => STDERR
       )
@@ -248,7 +248,7 @@ class RemailerConnectionTest < Test::Unit::TestCase
 
   def test_connect_and_long_send
     engine do
-      connection = Remailer::Connection.open(
+      connection = Remailer::SMTP::Client.open(
         TestConfig.smtp_server[:host],
         :debug => STDERR
       )
