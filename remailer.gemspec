@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = "remailer"
-  s.version = "0.4.21"
+  s.version = "0.5.0"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Scott Tadman"]
-  s.date = "2011-11-03"
+  s.date = "2012-03-19"
   s.description = "EventMachine SMTP Mail User Agent"
   s.email = "scott@twg.ca"
   s.extra_rdoc_files = [
@@ -21,24 +21,42 @@ Gem::Specification.new do |s|
     "Rakefile",
     "VERSION",
     "lib/remailer.rb",
-    "lib/remailer/connection.rb",
-    "lib/remailer/connection/smtp_interpreter.rb",
-    "lib/remailer/connection/socks5_interpreter.rb",
+    "lib/remailer/abstract_connection.rb",
+    "lib/remailer/constants.rb",
+    "lib/remailer/email_address.rb",
+    "lib/remailer/imap.rb",
+    "lib/remailer/imap/client.rb",
+    "lib/remailer/imap/client/interpreter.rb",
+    "lib/remailer/imap/server.rb",
+    "lib/remailer/imap/server/interpreter.rb",
     "lib/remailer/interpreter.rb",
     "lib/remailer/interpreter/state_proxy.rb",
+    "lib/remailer/smtp.rb",
+    "lib/remailer/smtp/client.rb",
+    "lib/remailer/smtp/client/interpreter.rb",
+    "lib/remailer/smtp/server.rb",
+    "lib/remailer/smtp/server/interpreter.rb",
+    "lib/remailer/smtp/server/transaction.rb",
+    "lib/remailer/socks5.rb",
+    "lib/remailer/socks5/client.rb",
+    "lib/remailer/socks5/client/interpreter.rb",
+    "lib/remailer/support.rb",
     "remailer.gemspec",
     "test/config.example.rb",
     "test/helper.rb",
-    "test/unit/remailer_connection_smtp_interpreter_test.rb",
-    "test/unit/remailer_connection_socks5_interpreter_test.rb",
-    "test/unit/remailer_connection_test.rb",
+    "test/unit/remailer_imap_client_interpreter_test.rb",
+    "test/unit/remailer_imap_client_test.rb",
     "test/unit/remailer_interpreter_state_proxy_test.rb",
     "test/unit/remailer_interpreter_test.rb",
+    "test/unit/remailer_smtp_client_interpreter_test.rb",
+    "test/unit/remailer_smtp_client_test.rb",
+    "test/unit/remailer_smtp_server_test.rb",
+    "test/unit/remailer_socks5_client_interpreter_test.rb",
     "test/unit/remailer_test.rb"
   ]
   s.homepage = "http://github.com/twg/remailer"
   s.require_paths = ["lib"]
-  s.rubygems_version = "1.8.10"
+  s.rubygems_version = "1.8.17"
   s.summary = "Reactor-Ready SMTP Mailer"
 
   if s.respond_to? :specification_version then

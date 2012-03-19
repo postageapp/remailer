@@ -7,9 +7,7 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
   
   state :initialized do
     enter do
-      delegate.send_line("220 #{delegate.server_name} PostageApp ESMTP Server Ready")
-      
-      delegate.accepted_connection(self.pool)
+      self.send_banner
       
       enter_state(:reset)
     end
@@ -17,7 +15,7 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
   
   state :reset do
     enter do
-      @email = Birdbrain::Email.new
+      self.reset_transaction!
       
       enter_state(:ready)
     end
@@ -27,7 +25,7 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
     interpret(/^\s*EHLO\s+(\S+)\s*$/) do |remote_host|
       delegate.validate_hostname(remote_host) do |valid|
         if (valid)
-          Birdbrain.engine.logger.debug("#{delegate.remote_ip}:#{delegate.remote_port} to #{delegate.local_ip}:#{delegate.local_port} Accepting connection from #{remote_host}")
+          delegate.log(:debug, "#{delegate.remote_ip}:#{delegate.remote_port} to #{delegate.local_ip}:#{delegate.local_port} Accepting connection from #{remote_host}")
           @remote_host = remote_host
 
           delegate.send_line("250-#{delegate.server_name} Hello #{delegate.remote_host} [#{delegate.remote_ip}]")
@@ -36,7 +34,7 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
           delegate.send_line("250-STARTTLS") if (delegate.tls?)
           delegate.send_line("250 OK")
         else
-          Birdbrain.engine.logger.debug("#{delegate.remote_ip}:#{delegate.remote_port} to #{delegate.local_ip}:#{delegate.local_port} Rejecting connection from #{remote_host} because of invalid FQDN")
+          delegate.log(:debug, "#{delegate.remote_ip}:#{delegate.remote_port} to #{delegate.local_ip}:#{delegate.local_port} Rejecting connection from #{remote_host} because of invalid FQDN")
           delegate.send_line("504 Need fully qualified hostname")
         end
       end
@@ -45,44 +43,44 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
     interpret(/^\s*HELO\s+(\S+)\s*$/) do |remote_host|
       delegate.validate_hostname(remote_host) do |valid|
         if (valid)
-          Birdbrain.engine.logger.debug("#{delegate.remote_ip}:#{delegate.remote_port} to #{delegate.local_ip}:#{delegate.local_port} Accepting connection from #{remote_host}")
+          delegate.log(:debug, "#{delegate.remote_ip}:#{delegate.remote_port} to #{delegate.local_ip}:#{delegate.local_port} Accepting connection from #{remote_host}")
           @remote_host = remote_host
 
           delegate.send_line("250 #{delegate.server_name} Hello #{delegate.remote_host} [#{delegate.remote_ip}]")
         else
-          Birdbrain.engine.logger.debug("#{delegate.remote_ip}:#{delegate.remote_port} to #{delegate.local_ip}:#{delegate.local_port} Rejecting connection from #{remote_host} because of invalid FQDN")
+          delegate.log(:debug, "#{delegate.remote_ip}:#{delegate.remote_port} to #{delegate.local_ip}:#{delegate.local_port} Rejecting connection from #{remote_host} because of invalid FQDN")
           delegate.send_line("504 Need fully qualified hostname")
         end
       end
     end
     
     interpret(/^\s*MAIL\s+FROM:\s*<([^>]+)>\s*/) do |address|
-      if (Birdbrain::EmailAddress.valid?(address))
+      if (Remailer::EmailAddress.valid?(address))
         accept, message = will_accept_sender(address)
 
         if (accept)
-          @email.sender = address
+          @transaction.sender = address
         end
 
         delegate.send_line(message)
       else
-        delegate.send_line("501 Email address is not valid")
+        delegate.send_line("501 Email address is not RFC compliant")
       end
     end
 
     interpret(/^\s*RCPT\s+TO:\s*<([^>]+)>\s*/) do |address|
-      if (@email.sender)
-        if (Birdbrain::EmailAddress.valid?(address))
+      if (@transaction.sender)
+        if (Remailer::EmailAddress.valid?(address))
           accept, message = will_accept_recipient(address)
 
           if (accept)
-            @email.recipients ||= [ ]
-            @email.recipients << address
+            @transaction.recipients ||= [ ]
+            @transaction.recipients << address
           end
 
           delegate.send_line(message)
         else
-          delegate.send_line("501 Email address is not valid")
+          delegate.send_line("501 Email address is not RFC compliant")
         end
       else
         delegate.send_line("503 Sender not specified")
@@ -105,8 +103,8 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
       elsif (delegate.tls?)
         delegate.send_line("220 TLS ready to start")
         delegate.start_tls(
-          :private_key_file => Birdbrain.private_key_path,
-          :cert_chain_file => Birdbrain.ssl_cert_path
+          :private_key_file => Remailer::SMTP::Server.private_key_path,
+          :cert_chain_file => Remailer::SMTP::Server.ssl_cert_path
         )
         
         @tls_started = true
@@ -116,7 +114,7 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
     end
     
     interpret(/^\s*DATA\s*$/) do
-      if (@email.sender)
+      if (@transaction.sender)
       else
         delegate.send_line("503 valid RCPT command must precede DATA")
       end
@@ -144,19 +142,25 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
   
   state :data do
     interpret(/^\.$/) do
-      accept, message = will_accept_mail(@email)
+      accept, message = will_accept_transaction(@transaction)
       
-      delegate.receive_message(@email, accept)
-      
-      delegate.send_line(message)
+      if (accept)
+        accept, message = delegate.receive_transaction(@transaction)
+        
+        delegate.send_line(message)
+      else
+        delegate.send_line(message)
+      end
 
-      @email = Birdbrain::Email.new
+      self.reset_transaction!
 
       enter_state(:ready)
     end
     
     default do |line|
-      @email.data << (line + Birdbrain::SmtpServer::CRLF)
+      # RFC5321 4.5.2 - Leading dot is removed if line has content
+      
+      @transaction.data << (line.sub(/^\./, '') + Remailer::Constants::CRLF)
     end
   end
   
@@ -179,7 +183,7 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
 
   state :timeout do
     enter do
-      delegate.send_line("420 Too slow")
+      delegate.send_line("420 Idle connection closed")
 
       delegate.close_connection(true)
     end
@@ -187,14 +191,22 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
 
   # == Instance Methods =====================================================
 
-  def enter_state(state)
-    self.reset_ttl!
-    
-    super(state)
+  def reset_transaction!
+    @transaction = Remailer::SMTP::Server::Transaction.new
+  end
+
+  def send_banner
+    delegate.send_line("220 #{delegate.server_name} Remailer ESMTP Server Ready")
   end
 
   def reset_ttl!
     @timeout_at = Time.now + self.connection_ttl
+  end
+
+  def enter_state(state)
+    self.reset_ttl!
+    
+    super(state)
   end
 
   def connection_ttl
@@ -210,14 +222,6 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
       enter_state(:timeout)
     end
   end
-
-  def pool
-    @pool || delegate.local_ip
-  end
-  
-  def pool=(value)
-    @pool = value
-  end
   
   def will_accept_sender(sender)
     [ true, "250 Accepted" ]
@@ -227,13 +231,7 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
     [ true, "250 Accepted" ]
   end
   
-  def will_accept_mail(email)
+  def will_accept_transaction(transaction)
     [ true, "250 Accepted" ]
-  end
-  
-  # == Submodules ===========================================================
-  
-  Dir.glob(File.expand_path('persona/**/*.rb', File.dirname(__FILE__))).each do |file|
-    require file
   end
 end

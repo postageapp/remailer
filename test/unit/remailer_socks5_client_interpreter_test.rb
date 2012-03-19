@@ -52,7 +52,7 @@ class SOCKS5Delegate
   end
 end
 
-class RemailerSMTPClientSOCKS5InterpreterTest < Test::Unit::TestCase
+class RemailerSOCKS5ClientInterpreterTest < Test::Unit::TestCase
   def test_defaults
     delegate = SOCKS5Delegate.new(
       :proxy => {
@@ -60,7 +60,7 @@ class RemailerSMTPClientSOCKS5InterpreterTest < Test::Unit::TestCase
       }
     )
 
-    interpreter = Remailer::SMTP::Client::SOCKS5Interpreter.new(:delegate => delegate)
+    interpreter = Remailer::SOCKS5::Client::Interpreter.new(:delegate => delegate)
     
     assert_equal :initialized, interpreter.state
     assert_equal false, delegate.closed?
@@ -74,7 +74,7 @@ class RemailerSMTPClientSOCKS5InterpreterTest < Test::Unit::TestCase
         :host => 'example.net'
       }
     )
-    interpreter = Remailer::SMTP::Client::SOCKS5Interpreter.new(:delegate => delegate)
+    interpreter = Remailer::SOCKS5::Client::Interpreter.new(:delegate => delegate)
     
     assert_equal :initialized, interpreter.state
     assert_equal false, delegate.closed?
@@ -83,11 +83,11 @@ class RemailerSMTPClientSOCKS5InterpreterTest < Test::Unit::TestCase
     
     assert_equal 2, sent.length
     
-    assert_equal [ Remailer::SMTP::Client::SOCKS5Interpreter::SOCKS5_VERSION, 0 ], sent.unpack('CC')
+    assert_equal [ Remailer::SOCKS5::Client::Interpreter::SOCKS5_VERSION, 0 ], sent.unpack('CC')
     
     reply = [
-      Remailer::SMTP::Client::SOCKS5Interpreter::SOCKS5_VERSION,
-      Remailer::SMTP::Client::SOCKS5Interpreter::SOCKS5_METHOD[:no_auth]
+      Remailer::SOCKS5::Client::Interpreter::SOCKS5_VERSION,
+      Remailer::SOCKS5::Client::Interpreter::SOCKS5_METHOD[:no_auth]
     ].pack('CC')
     
     interpreter.process(reply)
@@ -102,19 +102,19 @@ class RemailerSMTPClientSOCKS5InterpreterTest < Test::Unit::TestCase
     assert_equal 10, sent.length
     
     assert_equal [
-      Remailer::SMTP::Client::SOCKS5Interpreter::SOCKS5_VERSION,
-      Remailer::SMTP::Client::SOCKS5Interpreter::SOCKS5_COMMAND[:connect],
+      Remailer::SOCKS5::Client::Interpreter::SOCKS5_VERSION,
+      Remailer::SOCKS5::Client::Interpreter::SOCKS5_COMMAND[:connect],
       0,
-      Remailer::SMTP::Client::SOCKS5Interpreter::SOCKS5_ADDRESS_TYPE[:ipv4],
+      Remailer::SOCKS5::Client::Interpreter::SOCKS5_ADDRESS_TYPE[:ipv4],
       [ 1, 2, 3, 4 ].pack('CCCC'),
       4321
     ], sent.unpack('CCCCA4n')
 
     interpreter.process([
-      Remailer::SMTP::Client::SOCKS5Interpreter::SOCKS5_VERSION,
+      Remailer::SOCKS5::Client::Interpreter::SOCKS5_VERSION,
       0, # No error
       0,
-      Remailer::SMTP::Client::SOCKS5Interpreter::SOCKS5_ADDRESS_TYPE[:ipv4],
+      Remailer::SOCKS5::Client::Interpreter::SOCKS5_ADDRESS_TYPE[:ipv4],
       [ 1, 2, 3, 4 ].pack('CCCC'),
       4321
     ].pack('CCCCA4n'))

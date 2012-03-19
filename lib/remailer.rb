@@ -3,9 +3,10 @@ module Remailer
   
   autoload(:AbstractConnection, 'remailer/abstract_connection')
   autoload(:Constants, 'remailer/constants')
-  autoload(:IMAP, 'remailer/imap')
+  autoload(:EmailAddress, 'remailer/email_address')
   autoload(:Interpreter, 'remailer/interpreter')
-  autoload(:SOCKS5, 'remailer/socks5')
+  autoload(:IMAP, 'remailer/imap')
   autoload(:SMTP, 'remailer/smtp')
+  autoload(:SOCKS5, 'remailer/socks5')
   autoload(:Support, 'remailer/support')
 end

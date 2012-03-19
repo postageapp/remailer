@@ -406,7 +406,7 @@ class Remailer::AbstractConnection < EventMachine::Connection
 
   # Switches to use the SOCKS5 interpreter for all subsequent communication
   def use_socks5_interpreter!
-    @interpreter = SOCKS5Interpreter.new(:delegate => self)
+    @interpreter = Remailer::SOCKS5::Client::Interpreter.new(:delegate => self)
   end
   
   # -- Callbacks and Notifications ------------------------------------------

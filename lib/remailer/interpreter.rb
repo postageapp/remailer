@@ -67,9 +67,9 @@ class Remailer::Interpreter
   
   # This is a method to convert a spec and a block into a proper parser
   # method. If spec is specified, it should be a Fixnum, or a Regexp. A 
-  # Fixnum defines a  minimum size to process, useful for packed binary
-  # streams, and a Regexp defines a pattern that must match before the parser
-  # is engaged.
+  # Fixnum defines a minimum size to process, useful for packed binary
+  # streams, while a Regexp defines a pattern that must match before the
+  # parser is engaged.
   def self.create_parser_for_spec(spec, &block)
     case (spec)
     when nil
@@ -202,17 +202,18 @@ class Remailer::Interpreter
   end
 
   # Processes a given input string into interpretable tokens, processes these
-  # tokens, and removes them from the input string. If no interpretable
-  # tokens could be found, returns immediately. An optional block can be
+  # tokens, and removes them from the input string. An optional block can be
   # given that will be called as each interpretable token is discovered with
   # the token provided as the argument.
   def process(s)
     _parser = parser
 
-    while (parsed = s.empty? ? false : instance_exec(s, &_parser))
+    while (parsed = instance_exec(s, &_parser))
       yield(parsed) if (block_given?)
 
       interpret(*parsed)
+      
+      break if (s.empty?)
     end
   end
   
