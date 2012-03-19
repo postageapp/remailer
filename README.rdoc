@@ -1,6 +1,6 @@
 = remailer
 
-Reactor-Ready Mailer Engine
+Client/Server Mail Networking Library for SMTP and IMAP
 
 == Overview
 
@@ -104,4 +104,4 @@ release is made.
 
 == Copyright
 
-Copyright (c) 2010 Scott Tadman, The Working Group
+Copyright (c) 2010-2012 Scott Tadman, The Working Group
