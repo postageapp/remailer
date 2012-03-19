@@ -86,7 +86,7 @@ class Remailer::SOCKS5::Client::Interpreter < Remailer::Interpreter
   
   state :connect_through_proxy do
     enter do
-      delegate.proxy_connection_initiated
+      delegate.proxy_connection_initiated!
       
       if (@destination_address)
         delegate.debug_notification(:proxy, "Sending proxy connection request to #{@destination_address.unpack('CCCC').join('.')}:#{delegate.options[:port]}")
