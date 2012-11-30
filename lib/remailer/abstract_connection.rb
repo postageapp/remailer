@@ -249,7 +249,7 @@ class Remailer::AbstractConnection < EventMachine::Connection
     self.set_timer!
   end
   
-  def detach
+  def unbind
     self.cancel_timer!
 
     super

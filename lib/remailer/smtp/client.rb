@@ -171,7 +171,7 @@ class Remailer::SMTP::Client < Remailer::AbstractConnection
   end
   
   #
-  def detach
+  def unbind
     @timer.cancel
     super
   end
