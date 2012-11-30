@@ -31,7 +31,7 @@ class RemailerIMAPClientTest < Test::Unit::TestCase
         capabilities
       end
       
-      assert_equal %w[ IMAP4rev1 UNSELECT IDLE NAMESPACE QUOTA ID XLIST CHILDREN X-GM-EXT-1 XYZZY SASL-IR AUTH=XOAUTH ], capabilities
+      assert_equal %w[ IMAP4rev1 UNSELECT IDLE NAMESPACE QUOTA ID XLIST CHILDREN X-GM-EXT-1 XYZZY SASL-IR AUTH=XOAUTH AUTH=XOAUTH2 ], capabilities
       
       # -- LOGIN ------------------------------------------------------------
       
