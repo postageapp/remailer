@@ -1,7 +1,7 @@
 require 'rubygems'
 require 'test/unit'
 
-$LOAD_PATH.unshift(File.expand_path(*%w[ .. lib ]), File.dirname(__FILE__))
+$LOAD_PATH.unshift(File.expand_path('../lib', File.dirname(__FILE__)))
 $LOAD_PATH.unshift(File.dirname(__FILE__))
 
 require 'timeout'
@@ -13,6 +13,8 @@ begin
 rescue => e
   raise "EventMachine gem could not be loaded: #{e.class}: #{e}"
 end
+
+puts $LOAD_PATH.inspect
 
 require 'remailer'
 

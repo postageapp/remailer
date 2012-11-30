@@ -1,4 +1,4 @@
-require File.expand_path(File.join(*%w[ .. helper ]), File.dirname(__FILE__))
+require File.expand_path('../helper', File.dirname(__FILE__))
 
 class RemailerSMTPServerTest < Test::Unit::TestCase
   def test_bind
@@ -67,9 +67,9 @@ class RemailerSMTPServerTest < Test::Unit::TestCase
       
       sender = 'sender@example.com'.freeze
       recipient = 'recipient@example.net'.freeze
-      data = "Subject: Re: Test Message\r\n\r\nTest message.\r\n\r\n.test\r\n.\r\n".freeze
+      content = "Subject: Re: Test Message\r\n\r\nTest message.\r\n\r\n.test\r\n.\r\n".freeze
       
-      client.send_email(sender, recipient, data)
+      client.send_email(sender, recipient, content)
       
       assert_eventually(30) do
         transaction
@@ -77,7 +77,7 @@ class RemailerSMTPServerTest < Test::Unit::TestCase
       
       assert_equal sender, transaction.sender
       assert_equal [ recipient ], transaction.recipients
-      assert_equal data, transaction.data
+      assert_equal content + Remailer::Constants::CRLF, transaction.data
     end
   end
 end

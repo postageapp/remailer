@@ -1,6 +1,6 @@
 class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
   # == State Definitions ====================================================
-  
+
   default do |error|
     delegate.send_line("500 Invalid command")
   end
@@ -159,8 +159,8 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
     
     default do |line|
       # RFC5321 4.5.2 - Leading dot is removed if line has content
-      
-      @transaction.data << (line.sub(/^\./, '') + Remailer::Constants::CRLF)
+
+      @transaction.data << (line.sub(/^\./, '') << Remailer::Constants::CRLF)
     end
   end
   
