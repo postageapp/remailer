@@ -209,6 +209,8 @@ class Remailer::AbstractConnection < EventMachine::Connection
   def unbind
     return if (@unbound)
 
+    self.cancel_timer!
+
     self.after_unbind
 
     @unbound = true
@@ -247,12 +249,6 @@ class Remailer::AbstractConnection < EventMachine::Connection
 
   def post_init
     self.set_timer!
-  end
-  
-  def unbind
-    self.cancel_timer!
-
-    super
   end
   
   # Returns the current state of the active interpreter, or nil if no state
@@ -335,7 +331,7 @@ class Remailer::AbstractConnection < EventMachine::Connection
       remote_options = @options
       interpreter = @interpreter
       
-      if (@connecting_to_proxy)
+      if (self.proxy_connection_initiated?)
         remote_options = @options[:proxy]
       end
       

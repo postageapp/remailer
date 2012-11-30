@@ -163,18 +163,6 @@ class Remailer::SMTP::Client < Remailer::AbstractConnection
       error_notification(:out_of_band, "Receiving data before a protocol has been established.")
     end
   end
-
-  def post_init
-    @timer = EventMachine.add_periodic_timer(1) do
-      check_for_timeouts!
-    end
-  end
-  
-  #
-  def unbind
-    @timer.cancel
-    super
-  end
   
   # Returns the current state of the active interpreter, or nil if no state
   # is assigned.
@@ -213,62 +201,6 @@ class Remailer::SMTP::Client < Remailer::AbstractConnection
     address
   rescue
     nil
-  end
-
-  # Resets the timeout time. Returns the time at which a timeout will occur.
-  def reset_timeout!
-    @timeout_at = Time.now + @timeout
-  end
-  
-  # Returns the number of seconds remaining until a timeout will occur, or
-  # nil if no time-out is pending.
-  def time_remaning
-    @timeout_at and (@timeout_at.to_i - Time.now.to_i)
-  end
-  
-  # Checks for a timeout condition, and if one is detected, will close the
-  # connection and send appropriate callbacks.
-  def check_for_timeouts!
-    return if (!@timeout_at or Time.now < @timeout_at or @timed_out)
-
-    @timed_out = true
-    @timeout_at = nil
-
-    if (@connected and @active_message)
-      message_callback(:timeout, "Response timed out before send could complete")
-      error_notification(:timeout, "Response timed out")
-      debug_notification(:timeout, "Response timed out")
-      send_callback(:on_error)
-    elsif (!@connected)
-      remote_options = @options
-      interpreter = @interpreter
-      
-      if (self.proxy_connection_initiated?)
-        remote_options = @options[:proxy]
-      end
-      
-      message = "Timed out before a connection could be established to #{remote_options[:host]}:#{remote_options[:port]}"
-      
-      if (interpreter)
-        message << " using #{interpreter.label}"
-      end
-      
-      connect_notification(false, message)
-      debug_notification(:timeout, message)
-      error_notification(:timeout, message)
-
-      send_callback(:on_error)
-    else
-      interpreter = @interpreter
-
-      if (interpreter and interpreter.respond_to?(:close))
-        interpreter.close
-      else
-        send_callback(:on_disconnect)
-      end
-    end
-
-    close_connection
   end
   
   # Returns true if pipelining support has been detected on the connection,
