@@ -1,8 +1,8 @@
-= remailer
+# remailer
 
 Client/Server Mail Networking Library for SMTP and IMAP
 
-== Overview
+## Overview
 
 This is an EventMachine Connection implementation of a high-performance
 asynchronous SMTP client. Although EventMachine ships with a built-in SMTP
@@ -10,7 +10,7 @@ client, that version is limited to sending a single email per client,
 and since establishing a client can be the majority of the time required
 to send email, this limits throughput considerably.
 
-== Use
+## Use
 
 The Remailer system consists of the Remailer::Connection class which works
 within the EventMachine environment. To use it, create a client and then
@@ -90,18 +90,18 @@ server. Success is defined as 250, errors vary:
 
 A status code of nil is sent if the server timed out or the connection failed.
 
-== Tests
+## Tests
 
 In order to run tests, copy `test/config.example.rb` to `test/config.rb` and
 adjust as required. For obvious reasons, passwords to SMTP test accounts are
 not included in the source code of this library.
 
-== Status
+## Status
 
 This software is currently experimental and is not recommended for production
 use. Many of the internals may change significantly before a proper beta
 release is made.
 
-== Copyright
+## Copyright
 
-Copyright (c) 2010-2012 Scott Tadman, The Working Group
+Copyright (c) 2010-2013 Scott Tadman, The Working Group
