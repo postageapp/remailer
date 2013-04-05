@@ -61,6 +61,8 @@ class Remailer::SMTP::Client < Remailer::AbstractConnection
   def after_initialize
     @protocol = :smtp
 
+    send_callback(:before_connect)
+
     if (using_proxy?)
       proxy_connection_initiated!
       use_socks5_interpreter!

@@ -5,19 +5,20 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
     engine do
       debug = { }
       connected_host = nil
+      on_disconnect_triggered = false
 
       connection = Remailer::SMTP::Client.open(
         TestConfig.smtp_server[:host],
         :debug => STDERR, 
-        :connect => lambda { |success, host| connected_host = host }
+        :connect => lambda { |success, host|
+          connected_host = host
+        },
+        :on_disconnect => lambda {
+          on_disconnect_triggered = true
+        }
       )
 
-      after_complete_trigger = false
-
       connection.close_when_complete!
-      connection.after_complete do
-        after_complete_trigger = true
-      end
 
       assert_equal :initialized, connection.state
       assert !connection.error?
@@ -29,7 +30,7 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
 
       assert_equal TestConfig.smtp_server[:host], connected_host
 
-      assert_equal true, after_complete_trigger
+      assert_equal true, on_disconnect_triggered
 
       assert_equal 52428800, connection.max_size
       assert_equal :esmtp, connection.protocol
@@ -99,11 +100,11 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
         :password => TestConfig.public_smtp_server[:password]
       )
 
-      after_complete_trigger = false
+      on_disconnect_triggered = false
 
       connection.close_when_complete!
       connection.after_complete do
-        after_complete_trigger = true
+        on_disconnect_triggered = true
       end
 
       assert_equal :initialized, connection.state
@@ -115,7 +116,7 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
 
       assert_equal TestConfig.public_smtp_server[:identifier], connection.remote
 
-      assert_equal true, after_complete_trigger
+      assert_equal true, on_disconnect_triggered
 
       assert_equal 35651584, connection.max_size
       assert_equal :esmtp, connection.protocol
@@ -127,21 +128,21 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
     engine do
       debug = { }
 
+      on_disconnect_triggered = false
+
       connection = Remailer::SMTP::Client.open(
         TestConfig.smtp_server[:host],
         :debug => STDERR,
         :proxy => {
           :proto => :socks5,
           :host => TestConfig.proxy_server
+        },
+        :on_disconnect => lambda {
+          on_disconnect_triggered = true
         }
       )
 
-      after_complete_trigger = false
-
       connection.close_when_complete!
-      connection.after_complete do
-        after_complete_trigger = true
-      end
 
       assert_equal :connect_to_proxy, connection.state
       assert !connection.error?
@@ -152,7 +153,7 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
 
       assert_equal TestConfig.smtp_server[:identifier], connection.remote
 
-      assert_equal true, after_complete_trigger
+      assert_equal true, on_disconnect_triggered
 
       assert_equal 52428800, connection.max_size
       assert_equal :esmtp, connection.protocol
