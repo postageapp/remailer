@@ -5,19 +5,19 @@
 
 Gem::Specification.new do |s|
   s.name = "remailer"
-  s.version = "0.5.2"
+  s.version = "0.6.0"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Scott Tadman"]
-  s.date = "2012-11-30"
+  s.date = "2013-04-05"
   s.description = "EventMachine SMTP Mail User Agent"
   s.email = "scott@twg.ca"
   s.extra_rdoc_files = [
-    "README.rdoc"
+    "README.md"
   ]
   s.files = [
     ".document",
-    "README.rdoc",
+    "README.md",
     "Rakefile",
     "VERSION",
     "lib/remailer.rb",
@@ -56,11 +56,11 @@ Gem::Specification.new do |s|
   ]
   s.homepage = "http://github.com/twg/remailer"
   s.require_paths = ["lib"]
-  s.rubygems_version = "1.8.24"
+  s.rubygems_version = "2.0.3"
   s.summary = "Reactor-Ready SMTP Mailer"
 
   if s.respond_to? :specification_version then
-    s.specification_version = 3
+    s.specification_version = 4
 
     if Gem::Version.new(Gem::VERSION) >= Gem::Version.new('1.2.0') then
       s.add_runtime_dependency(%q<eventmachine>, [">= 0"])
