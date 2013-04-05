@@ -14,8 +14,6 @@ rescue => e
   raise "EventMachine gem could not be loaded: #{e.class}: #{e}"
 end
 
-puts $LOAD_PATH.inspect
-
 require 'remailer'
 
 class Proc
@@ -57,8 +55,6 @@ class Test::Unit::TestCase
     
     ThreadsWait.all_waits(
       Thread.new do
-        Thread.abort_on_exception = true
-
         # Create a thread for the engine to run on
         begin
           EventMachine.run

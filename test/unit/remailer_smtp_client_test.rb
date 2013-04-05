@@ -9,6 +9,8 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
 
       connection = Remailer::SMTP::Client.open(
         TestConfig.smtp_server[:host],
+        :username => TestConfig.smtp_server[:username],
+        :password => TestConfig.smtp_server[:password],
         :debug => STDERR, 
         :connect => lambda { |success, host|
           connected_host = host
@@ -28,11 +30,11 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
         connection.closed?
       end
 
-      assert_equal TestConfig.smtp_server[:host], connected_host
+      assert_equal TestConfig.smtp_server[:identifier], connected_host
 
       assert_equal true, on_disconnect_triggered
 
-      assert_equal 52428800, connection.max_size
+      assert_equal 35882577, connection.max_size
       assert_equal :esmtp, connection.protocol
       assert_equal true, connection.tls_support?
     end
@@ -91,21 +93,20 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
   def test_connect_with_auth
     engine do
       debug = { }
+      on_disconnect_triggered = false
 
       connection = Remailer::SMTP::Client.open(
         TestConfig.public_smtp_server[:host],
+        :username => TestConfig.public_smtp_server[:username],
+        :password => TestConfig.public_smtp_server[:password],
         :port => TestConfig.public_smtp_server[:port] || Remailer::SMTP::Client::SMTP_PORT,
         :debug => STDERR,
-        :username => TestConfig.public_smtp_server[:username],
-        :password => TestConfig.public_smtp_server[:password]
+        :on_disconnect => lambda {
+          on_disconnect_triggered = true
+        }
       )
 
-      on_disconnect_triggered = false
-
       connection.close_when_complete!
-      connection.after_complete do
-        on_disconnect_triggered = true
-      end
 
       assert_equal :initialized, connection.state
       assert !connection.error?
@@ -118,7 +119,7 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
 
       assert_equal true, on_disconnect_triggered
 
-      assert_equal 35651584, connection.max_size
+      assert_equal 35882577, connection.max_size
       assert_equal :esmtp, connection.protocol
       assert_equal true, connection.tls_support?
     end
@@ -132,6 +133,8 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
 
       connection = Remailer::SMTP::Client.open(
         TestConfig.smtp_server[:host],
+        :username => TestConfig.public_smtp_server[:username],
+        :password => TestConfig.public_smtp_server[:password],
         :debug => STDERR,
         :proxy => {
           :proto => :socks5,
@@ -144,7 +147,6 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
 
       connection.close_when_complete!
 
-      assert_equal :connect_to_proxy, connection.state
       assert !connection.error?
 
       assert_eventually(15) do
@@ -155,7 +157,7 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
 
       assert_equal true, on_disconnect_triggered
 
-      assert_equal 52428800, connection.max_size
+      assert_equal 35882577, connection.max_size
       assert_equal :esmtp, connection.protocol
       assert_equal true, connection.tls_support?
     end
@@ -165,6 +167,8 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
     engine do
       connection = Remailer::SMTP::Client.open(
         TestConfig.smtp_server[:host],
+        :username => TestConfig.public_smtp_server[:username],
+        :password => TestConfig.public_smtp_server[:password],
         :debug => STDERR
       )
 
@@ -198,6 +202,8 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
     engine do
       connection = Remailer::SMTP::Client.open(
         TestConfig.smtp_server[:host],
+        :username => TestConfig.public_smtp_server[:username],
+        :password => TestConfig.public_smtp_server[:password],
         :debug => STDERR
       )
 
@@ -223,6 +229,8 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
     engine do
       connection = Remailer::SMTP::Client.open(
         TestConfig.smtp_server[:host],
+        :username => TestConfig.public_smtp_server[:username],
+        :password => TestConfig.public_smtp_server[:password],
         :debug => STDERR
       )
 
@@ -251,6 +259,8 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
     engine do
       connection = Remailer::SMTP::Client.open(
         TestConfig.smtp_server[:host],
+        :username => TestConfig.smtp_server[:username],
+        :password => TestConfig.smtp_server[:password],
         :debug => STDERR
       )
 
@@ -279,7 +289,7 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
 protected
   def example_message
     example = <<__END__
-Date: Sat, 13 Nov 2010 02:25:24 +0000
+Date: Thu, 1 Jan 2013 01:02:03 +0000
 From: #{TestConfig.sender}
 To: Remailer Test <#{TestConfig.receiver}>
 Message-Id: <hfLkcIByfjYoNIxCO7DMsxBTX9svsFHikIOfAiYy@#{TestConfig.sender.split(/@/).last}>
