@@ -212,7 +212,7 @@ class Remailer::Interpreter
       yield(parsed) if (block_given?)
 
       interpret(*parsed)
-      
+
       break if (s.empty? or self.finished?)
     end
   end

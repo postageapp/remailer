@@ -128,6 +128,7 @@ class Remailer::SOCKS5::Client::Interpreter < Remailer::Interpreter
     
     default do |reply|
       @reply = reply
+
       enter_state(:failed)
     end
   end
@@ -191,6 +192,6 @@ class Remailer::SOCKS5::Client::Interpreter < Remailer::Interpreter
   end
 
   def finished?
-    self.state != :connected
+    self.state == :connected
   end
 end

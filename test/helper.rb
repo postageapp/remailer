@@ -16,8 +16,6 @@ rescue => e
   raise "EventMachine gem could not be loaded: #{e.class}: #{e}"
 end
 
-puts $LOAD_PATH.inspect
-
 require 'remailer'
 
 class Proc

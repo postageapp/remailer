@@ -121,4 +121,64 @@ class RemailerSOCKS5ClientInterpreterTest < MiniTest::Test
     
     assert_equal :connected, interpreter.state
   end
+
+  def test_combined_socks5_smtp
+    delegate = SOCKS5Delegate.new(
+      host: '1.2.3.4',
+      port: 4321,
+      proxy: {
+        host: 'example.net'
+      }
+    )
+    interpreter = Remailer::SOCKS5::Client::Interpreter.new(delegate: delegate)
+    
+    assert_equal :initialized, interpreter.state
+    assert_equal false, delegate.closed?
+    
+    sent = delegate.read
+    
+    assert_equal 2, sent.length
+    
+    assert_equal [ Remailer::SOCKS5::Client::Interpreter::SOCKS5_VERSION, 0 ], sent.unpack('CC')
+    
+    reply = [
+      Remailer::SOCKS5::Client::Interpreter::SOCKS5_VERSION,
+      Remailer::SOCKS5::Client::Interpreter::SOCKS5_METHOD[:no_auth]
+    ].pack('CC')
+    
+    interpreter.process(reply)
+    
+    assert_equal false, interpreter.error?
+    assert_equal :connect_through_proxy, interpreter.state
+    assert_equal '', reply
+    
+    sent = delegate.read
+
+    assert sent, "No data received"
+    assert_equal 10, sent.length
+    
+    assert_equal [
+      Remailer::SOCKS5::Client::Interpreter::SOCKS5_VERSION,
+      Remailer::SOCKS5::Client::Interpreter::SOCKS5_COMMAND[:connect],
+      0,
+      Remailer::SOCKS5::Client::Interpreter::SOCKS5_ADDRESS_TYPE[:ipv4],
+      [ 1, 2, 3, 4 ].pack('CCCC'),
+      4321
+    ], sent.unpack('CCCCA4n')
+
+    buffer = [
+      Remailer::SOCKS5::Client::Interpreter::SOCKS5_VERSION,
+      0, # No error
+      0,
+      Remailer::SOCKS5::Client::Interpreter::SOCKS5_ADDRESS_TYPE[:ipv4],
+      [ 1, 2, 3, 4 ].pack('CCCC'),
+      4321
+    ].pack('CCCCA4n') + '421 Welcome to an ESTMP Server'
+
+    interpreter.process(buffer)
+
+    assert_equal '421 Welcome to an ESTMP Server', buffer
+    
+    assert_equal :connected, interpreter.state
+  end
 end
