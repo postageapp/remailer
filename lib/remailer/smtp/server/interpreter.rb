@@ -103,8 +103,8 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
       elsif (delegate.tls?)
         delegate.send_line("220 TLS ready to start")
         delegate.start_tls(
-          :private_key_file => Remailer::SMTP::Server.private_key_path,
-          :cert_chain_file => Remailer::SMTP::Server.ssl_cert_path
+          private_key_file: Remailer::SMTP::Server.private_key_path,
+          cert_chain_file: Remailer::SMTP::Server.ssl_cert_path
         )
         
         @tls_started = true

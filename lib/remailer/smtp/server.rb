@@ -69,7 +69,7 @@ class Remailer::SMTP::Server < EventMachine::Protocols::LineAndTextProtocol
   def post_init
     super
 
-    @interpreter = Interpreter.new(:delegate => self)
+    @interpreter = Interpreter.new(delegate: self)
     
     if (@on_connect)
       @on_connect.call(@remote_ip)
