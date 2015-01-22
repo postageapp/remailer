@@ -69,6 +69,11 @@ class Remailer::SMTP::Client < Remailer::AbstractConnection
     end
   end
 
+  # Switches to use the SOCKS5 interpreter for all subsequent communication
+  def use_socks5_interpreter!
+    @interpreter = Remailer::SOCKS5::Client::Interpreter.new(delegate: self)
+  end
+
   # Closes the connection after all of the queued messages have been sent.
   def close_when_complete!
     @options[:close] = true

@@ -401,11 +401,6 @@ class Remailer::AbstractConnection < EventMachine::Connection
     
     reset_timeout!
   end
-
-  # Switches to use the SOCKS5 interpreter for all subsequent communication
-  def use_socks5_interpreter!
-    @interpreter = Remailer::SOCKS5::Client::Interpreter.new(delegate: self)
-  end
   
   # -- Callbacks and Notifications ------------------------------------------
 

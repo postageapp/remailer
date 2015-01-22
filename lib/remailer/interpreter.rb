@@ -213,7 +213,7 @@ class Remailer::Interpreter
 
       interpret(*parsed)
       
-      break if (s.empty?)
+      break if (s.empty? or self.finished?)
     end
   end
   
@@ -289,6 +289,12 @@ class Remailer::Interpreter
   # can be modified in sub-classes.
   def will_interpret?(proc, args)
     true
+  end
+
+  # Should return true if this interpreter no longer wants any data, false
+  # otherwise. Subclasses should implement their own behavior here.
+  def finished?
+    false
   end
   
   # Returns true if an error has been generated, false otherwise. The error
