@@ -245,6 +245,8 @@ class Remailer::AbstractConnection < EventMachine::Connection
     
   rescue Object => e
     STDERR.puts("[#{e.class}] #{e}")
+
+    raise e
   end
 
   def post_init

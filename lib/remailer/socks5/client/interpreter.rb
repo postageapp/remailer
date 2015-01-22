@@ -123,6 +123,9 @@ class Remailer::SOCKS5::Client::Interpreter < Remailer::Interpreter
     end
   
     interpret(0) do
+      # Immediately switch interpreter to avoid processing data as SOCKS5
+      delegate_call(:after_proxy_connected)
+
       enter_state(:connected)
     end
     
@@ -155,14 +158,15 @@ class Remailer::SOCKS5::Client::Interpreter < Remailer::Interpreter
     end
     
     interpret(0) do
+      # Immediately switch interpreter to avoid processing data as SOCKS5
+      delegate_call(:after_proxy_connected)
+
       enter_state(:connected)
     end
   end
   
   state :connected do
-    enter do
-      delegate_call(:after_proxy_connected)
-    end
+    # Terminal state for SOCKS5
   end
   
   state :failed do

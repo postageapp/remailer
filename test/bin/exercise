@@ -32,6 +32,7 @@ class Exerciser
       @pending << uuid
 
       connection_options = {
+        close: true,
         proxy: {
           host: @options[:proxy_host],
           port: @options[:proxy_port]

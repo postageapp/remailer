@@ -146,23 +146,6 @@ class Remailer::SMTP::Client < Remailer::AbstractConnection
   def unbound?
     !!@unbound
   end
-
-  # This implements the EventMachine::Connection#receive_data method that
-  # is called each time new data is received from the socket.
-  def receive_data(data)
-    reset_timeout!
-
-    @buffer ||= ''
-    @buffer << data
-
-    if (interpreter = @interpreter)
-      interpreter.process(@buffer) do |reply|
-        debug_notification(:receive, "[#{interpreter.label}] #{reply.inspect}")
-      end
-    else
-      error_notification(:out_of_band, "Receiving data before a protocol has been established.")
-    end
-  end
   
   # Returns the current state of the active interpreter, or nil if no state
   # is assigned.
