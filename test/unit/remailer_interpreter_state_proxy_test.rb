@@ -15,9 +15,9 @@ class RemailerInterpreterStateTest < Test::Unit::TestCase
     proxy = Remailer::Interpreter::StateProxy.new(options)
 
     expected = {
-      :enter => [ lambda { } ],
-      :default => [ lambda { } ],
-      :leave => [ lambda { } ]
+      enter: [ lambda { } ],
+      default: [ lambda { } ],
+      leave: [ lambda { } ]
     }.freeze
 
     proxy.enter(&expected[:enter][0])
@@ -31,9 +31,9 @@ class RemailerInterpreterStateTest < Test::Unit::TestCase
     options = { }
 
     expected = {
-      :enter => [ lambda { } ],
-      :terminate => [ lambda { } ],
-      :leave => [ lambda { } ]
+      enter: [ lambda { } ],
+      terminate: [ lambda { } ],
+      leave: [ lambda { } ]
     }.freeze
 
     Remailer::Interpreter::StateProxy.new(options) do
@@ -49,10 +49,10 @@ class RemailerInterpreterStateTest < Test::Unit::TestCase
     options = { }
     
     expected = {
-      :enter => [ lambda { } ],
-      :interpret => [ [ 10, lambda { } ], [ 1, lambda { } ] ],
-      :default => [ lambda { } ],
-      :leave => [ lambda { } ]
+      enter: [ lambda { } ],
+      interpret: [ [ 10, lambda { } ], [ 1, lambda { } ] ],
+      default: [ lambda { } ],
+      leave: [ lambda { } ]
     }.freeze
 
     Remailer::Interpreter::StateProxy.new(options) do
@@ -80,7 +80,7 @@ class RemailerInterpreterStateTest < Test::Unit::TestCase
     
     proxy.leave(&proc[1])
     
-    assert_equal({ :enter => [ proc[0] ] }, options_a)
-    assert_equal({ :leave => [ proc[1] ] }, options_b)
+    assert_equal({ enter: [ proc[0] ] }, options_a)
+    assert_equal({ leave: [ proc[1] ] }, options_b)
   end
 end

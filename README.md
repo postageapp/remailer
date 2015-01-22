@@ -21,7 +21,7 @@ make one or more requests to send email messages.
       # messages to STDERR.
       client = Remailer::SMTP::Client.open(
         'smtp.google.com',
-        :debug => STDERR
+        debug: STDERR
       )
       
       # Send a single email message through the client at the earliest
@@ -51,7 +51,7 @@ example is given here where the information is simply dumped on STDOUT:
 
     client = Remailer::SMTP::Client.open(
       'smtp.google.com',
-      :debug => lambda { |type, message|
+      debug: lambda { |type, message|
         puts "#{type}> #{message.inspect}"
       }
     )

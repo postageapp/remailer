@@ -5,14 +5,14 @@ class Remailer::SOCKS5::Client::Interpreter < Remailer::Interpreter
   SOCKS5_VERSION = 5
 
   SOCKS5_METHOD = {
-    :no_auth => 0,
-    :gssapi => 1,
-    :username_password => 2
+    no_auth: 0,
+    gssapi: 1,
+    username_password: 2
   }.freeze
   
   SOCKS5_COMMAND = {
-    :connect => 1,
-    :bind => 2
+    connect: 1,
+    bind: 2
   }.freeze
   
   SOCKS5_REPLY = {
@@ -28,9 +28,9 @@ class Remailer::SOCKS5::Client::Interpreter < Remailer::Interpreter
   }.freeze
   
   SOCKS5_ADDRESS_TYPE = {
-    :ipv4 => 1,
-    :domainname => 3,
-    :ipv6 => 4
+    ipv4: 1,
+    domainname: 3,
+    ipv6: 4
   }.freeze
   
   # == State Mapping ========================================================
@@ -114,9 +114,9 @@ class Remailer::SOCKS5::Client::Interpreter < Remailer::Interpreter
         [
           reply,
           {
-            :address => address,
-            :port => port,
-            :address_type => address_type
+            address: address,
+            port: port,
+            address_type: address_type
           }
         ]
       end

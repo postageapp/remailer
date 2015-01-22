@@ -20,7 +20,7 @@ class RemailerSMTPServerTest < Test::Unit::TestCase
       server = Remailer::SMTP::Server.bind(
         nil,
         server_port,
-        :on_connect => lambda { |_remote_ip| remote_ip = _remote_ip }
+        on_connect: lambda { |_remote_ip| remote_ip = _remote_ip }
       )
     
       assert server
@@ -29,9 +29,9 @@ class RemailerSMTPServerTest < Test::Unit::TestCase
 
       client = Remailer::SMTP::Client.open(
         'localhost',
-        :port => server_port,
-        :debug => STDERR, 
-        :connect => lambda { |success, host| connected_host = host }
+        port: server_port,
+        debug: STDERR, 
+        connect: lambda { |success, host| connected_host = host }
       )
       
       assert_eventually(30) do
@@ -52,7 +52,7 @@ class RemailerSMTPServerTest < Test::Unit::TestCase
       server = Remailer::SMTP::Server.bind(
         nil,
         server_port,
-        :on_transaction => lambda { |_transaction| transaction = _transaction }
+        on_transaction: lambda { |_transaction| transaction = _transaction }
       )
     
       assert server
@@ -61,8 +61,8 @@ class RemailerSMTPServerTest < Test::Unit::TestCase
 
       client = Remailer::SMTP::Client.open(
         'localhost',
-        :port => server_port,
-        :debug => STDERR
+        port: server_port,
+        debug: STDERR
       )
       
       sender = 'sender@example.com'.freeze

@@ -83,10 +83,10 @@ class Remailer::SMTP::Client < Remailer::AbstractConnection
     end
     
     message = {
-      :from => from,
-      :to => to,
-      :data => data,
-      :callback => block
+      from: from,
+      to: to,
+      data: data,
+      callback: block
     }
     
     @messages << message
@@ -108,10 +108,10 @@ class Remailer::SMTP::Client < Remailer::AbstractConnection
     end
     
     message = {
-      :from => from,
-      :to => to,
-      :test => true,
-      :callback => block
+      from: from,
+      to: to,
+      test: true,
+      callback: block
     }
     
     @messages << message

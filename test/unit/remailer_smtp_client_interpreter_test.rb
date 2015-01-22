@@ -127,12 +127,12 @@ class RemailerSMTPClientInterpreterTest < Test::Unit::TestCase
   end
 
   def test_delegate_options
-    delegate = SMTPDelegate.new(:use_tls => true)
+    delegate = SMTPDelegate.new(use_tls: true)
 
     assert_equal true, delegate.use_tls?
     assert_equal false, delegate.requires_authentication?
 
-    delegate = SMTPDelegate.new(:username => 'test@example.com', :password => 'tester')
+    delegate = SMTPDelegate.new(username: 'test@example.com', password: 'tester')
 
     assert_equal false, delegate.use_tls?
     assert_equal true, delegate.requires_authentication?
@@ -140,7 +140,7 @@ class RemailerSMTPClientInterpreterTest < Test::Unit::TestCase
 
   def test_standard_smtp_connection
     delegate = SMTPDelegate.new
-    interpreter = Remailer::SMTP::Client::Interpreter.new(:delegate => delegate)
+    interpreter = Remailer::SMTP::Client::Interpreter.new(delegate: delegate)
 
     assert_equal :initialized, interpreter.state
     
@@ -163,7 +163,7 @@ class RemailerSMTPClientInterpreterTest < Test::Unit::TestCase
 
   def test_standard_smtp_connection_send_email
     delegate = SMTPDelegate.new
-    interpreter = Remailer::SMTP::Client::Interpreter.new(:delegate => delegate)
+    interpreter = Remailer::SMTP::Client::Interpreter.new(delegate: delegate)
 
     assert_equal :initialized, interpreter.state
     
@@ -184,9 +184,9 @@ class RemailerSMTPClientInterpreterTest < Test::Unit::TestCase
     assert_equal true, delegate.closed?
     
     delegate.active_message = {
-      :from => 'from@example.com',
-      :to => 'to@example.com',
-      :data => "Subject: Test Message\r\n\r\nThis is a message!\r\n"
+      from: 'from@example.com',
+      to: 'to@example.com',
+      data: "Subject: Test Message\r\n\r\nThis is a message!\r\n"
     }
     
     interpreter.enter_state(:send)
@@ -218,7 +218,7 @@ class RemailerSMTPClientInterpreterTest < Test::Unit::TestCase
   
   def test_standard_esmtp_connection
     delegate = SMTPDelegate.new
-    interpreter = Remailer::SMTP::Client::Interpreter.new(:delegate => delegate)
+    interpreter = Remailer::SMTP::Client::Interpreter.new(delegate: delegate)
 
     assert_equal :initialized, interpreter.state
     
@@ -254,8 +254,8 @@ class RemailerSMTPClientInterpreterTest < Test::Unit::TestCase
   end
   
   def test_multi_line_hello_response
-    delegate = SMTPDelegate.new(:use_tls => true)
-    interpreter = Remailer::SMTP::Client::Interpreter.new(:delegate => delegate)
+    delegate = SMTPDelegate.new(use_tls: true)
+    interpreter = Remailer::SMTP::Client::Interpreter.new(delegate: delegate)
 
     assert_equal :initialized, interpreter.state
     assert_equal :smtp, delegate.protocol
@@ -276,8 +276,8 @@ class RemailerSMTPClientInterpreterTest < Test::Unit::TestCase
   end
 
   def test_tls_connection_with_support
-    delegate = SMTPDelegate.new(:use_tls => true)
-    interpreter = Remailer::SMTP::Client::Interpreter.new(:delegate => delegate)
+    delegate = SMTPDelegate.new(use_tls: true)
+    interpreter = Remailer::SMTP::Client::Interpreter.new(delegate: delegate)
     
     assert_equal true, delegate.use_tls?
     assert_equal :initialized, interpreter.state
@@ -307,8 +307,8 @@ class RemailerSMTPClientInterpreterTest < Test::Unit::TestCase
   end
 
   def test_tls_connection_without_support
-    delegate = SMTPDelegate.new(:use_tls => true)
-    interpreter = Remailer::SMTP::Client::Interpreter.new(:delegate => delegate)
+    delegate = SMTPDelegate.new(use_tls: true)
+    interpreter = Remailer::SMTP::Client::Interpreter.new(delegate: delegate)
 
     interpreter.process("220 mail.example.com ESMTP Exim 4.63\r\n")
     assert_equal 'EHLO localhost.local', delegate.read
@@ -322,8 +322,8 @@ class RemailerSMTPClientInterpreterTest < Test::Unit::TestCase
   end
 
   def test_basic_smtp_plaintext_auth_accepted
-    delegate = SMTPDelegate.new(:username => 'tester@example.com', :password => 'tester')
-    interpreter = Remailer::SMTP::Client::Interpreter.new(:delegate => delegate)
+    delegate = SMTPDelegate.new(username: 'tester@example.com', password: 'tester')
+    interpreter = Remailer::SMTP::Client::Interpreter.new(delegate: delegate)
     
     assert delegate.requires_authentication?
 
@@ -348,8 +348,8 @@ class RemailerSMTPClientInterpreterTest < Test::Unit::TestCase
   end
 
   def test_basic_esmtp_plaintext_auth_accepted
-    delegate = SMTPDelegate.new(:username => 'tester@example.com', :password => 'tester')
-    interpreter = Remailer::SMTP::Client::Interpreter.new(:delegate => delegate)
+    delegate = SMTPDelegate.new(username: 'tester@example.com', password: 'tester')
+    interpreter = Remailer::SMTP::Client::Interpreter.new(delegate: delegate)
 
     interpreter.process("220 mail.example.com ESMTP Exim 4.63\r\n")
     assert_equal 'EHLO localhost.local', delegate.read
@@ -368,8 +368,8 @@ class RemailerSMTPClientInterpreterTest < Test::Unit::TestCase
   end
 
   def test_basic_esmtp_plaintext_auth_rejected
-    delegate = SMTPDelegate.new(:username => 'tester@example.com', :password => 'tester')
-    interpreter = Remailer::SMTP::Client::Interpreter.new(:delegate => delegate)
+    delegate = SMTPDelegate.new(username: 'tester@example.com', password: 'tester')
+    interpreter = Remailer::SMTP::Client::Interpreter.new(delegate: delegate)
 
     interpreter.process("220 mx.google.com ESMTP\r\n")
     assert_equal 'EHLO localhost.local', delegate.read
@@ -396,8 +396,8 @@ class RemailerSMTPClientInterpreterTest < Test::Unit::TestCase
   end
 
   def test_unexpected_response
-    delegate = SMTPDelegate.new(:username => 'tester@example.com', :password => 'tester')
-    interpreter = Remailer::SMTP::Client::Interpreter.new(:delegate => delegate)
+    delegate = SMTPDelegate.new(username: 'tester@example.com', password: 'tester')
+    interpreter = Remailer::SMTP::Client::Interpreter.new(delegate: delegate)
 
     interpreter.process("530 Go away\r\n")
     

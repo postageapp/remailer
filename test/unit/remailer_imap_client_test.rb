@@ -11,8 +11,8 @@ class RemailerIMAPClientTest < Test::Unit::TestCase
       
       client = Remailer::IMAP::Client.open(
         TestConfig.imap_server[:host],
-        :debug => STDERR, 
-        :connect => lambda { |success, host| connected_host = host }
+        debug: STDERR, 
+        connect: lambda { |success, host| connected_host = host }
       )
       
       assert client

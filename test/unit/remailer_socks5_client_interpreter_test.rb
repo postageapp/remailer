@@ -55,12 +55,12 @@ end
 class RemailerSOCKS5ClientInterpreterTest < Test::Unit::TestCase
   def test_defaults
     delegate = SOCKS5Delegate.new(
-      :proxy => {
-        :host => 'example.net'
+      proxy: {
+        host: 'example.net'
       }
     )
 
-    interpreter = Remailer::SOCKS5::Client::Interpreter.new(:delegate => delegate)
+    interpreter = Remailer::SOCKS5::Client::Interpreter.new(delegate: delegate)
     
     assert_equal :initialized, interpreter.state
     assert_equal false, delegate.closed?
@@ -68,13 +68,13 @@ class RemailerSOCKS5ClientInterpreterTest < Test::Unit::TestCase
   
   def test_simple_connection
     delegate = SOCKS5Delegate.new(
-      :host => '1.2.3.4',
-      :port => 4321,
-      :proxy => {
-        :host => 'example.net'
+      host: '1.2.3.4',
+      port: 4321,
+      proxy: {
+        host: 'example.net'
       }
     )
-    interpreter = Remailer::SOCKS5::Client::Interpreter.new(:delegate => delegate)
+    interpreter = Remailer::SOCKS5::Client::Interpreter.new(delegate: delegate)
     
     assert_equal :initialized, interpreter.state
     assert_equal false, delegate.closed?

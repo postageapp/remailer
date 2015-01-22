@@ -8,8 +8,8 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
 
       connection = Remailer::SMTP::Client.open(
         TestConfig.smtp_server[:host],
-        :debug => STDERR, 
-        :connect => lambda { |success, host| connected_host = host }
+        debug: STDERR, 
+        connect: lambda { |success, host| connected_host = host }
       )
 
       after_complete_trigger = false
@@ -45,13 +45,13 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
 
       connection = Remailer::SMTP::Client.open(
         'example.com',
-        :debug => STDERR,
-        :error => lambda { |code, message|
+        debug: STDERR,
+        error: lambda { |code, message|
           error_received = [ code, message ]
         },
-        :on_connect => lambda { on_connect = true },
-        :on_error => lambda { on_error = true },
-        :timeout => 1
+        on_connect: lambda { on_connect = true },
+        on_error: lambda { on_error = true },
+        timeout: 1
       )
 
       assert_eventually(3) do
@@ -72,11 +72,11 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
 
       connection = Remailer::SMTP::Client.open(
         'invalid-example-domain--x.com',
-        :debug => STDERR,
-        :error => lambda { |code, message|
+        debug: STDERR,
+        error: lambda { |code, message|
           error_received = [ code, message ]
         },
-        :timeout => 1
+        timeout: 1
       )
 
       assert_eventually(3) do
@@ -93,10 +93,10 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
 
       connection = Remailer::SMTP::Client.open(
         TestConfig.public_smtp_server[:host],
-        :port => TestConfig.public_smtp_server[:port] || Remailer::SMTP::Client::SMTP_PORT,
-        :debug => STDERR,
-        :username => TestConfig.public_smtp_server[:username],
-        :password => TestConfig.public_smtp_server[:password]
+        port: TestConfig.public_smtp_server[:port] || Remailer::SMTP::Client::SMTP_PORT,
+        debug: STDERR,
+        username: TestConfig.public_smtp_server[:username],
+        password: TestConfig.public_smtp_server[:password]
       )
 
       after_complete_trigger = false
@@ -129,10 +129,10 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
 
       connection = Remailer::SMTP::Client.open(
         TestConfig.smtp_server[:host],
-        :debug => STDERR,
-        :proxy => {
-          :proto => :socks5,
-          :host => TestConfig.proxy_server
+        debug: STDERR,
+        proxy: {
+          proto: :socks5,
+          host: TestConfig.proxy_server
         }
       )
 
@@ -164,7 +164,7 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
     engine do
       connection = Remailer::SMTP::Client.open(
         TestConfig.smtp_server[:host],
-        :debug => STDERR
+        debug: STDERR
       )
 
       assert_equal :initialized, connection.state
@@ -197,7 +197,7 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
     engine do
       connection = Remailer::SMTP::Client.open(
         TestConfig.smtp_server[:host],
-        :debug => STDERR
+        debug: STDERR
       )
 
       assert_equal :initialized, connection.state
@@ -222,7 +222,7 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
     engine do
       connection = Remailer::SMTP::Client.open(
         TestConfig.smtp_server[:host],
-        :debug => STDERR
+        debug: STDERR
       )
 
       assert_equal :initialized, connection.state
@@ -250,7 +250,7 @@ class RemailerSMTPClientTest < Test::Unit::TestCase
     engine do
       connection = Remailer::SMTP::Client.open(
         TestConfig.smtp_server[:host],
-        :debug => STDERR
+        debug: STDERR
       )
 
       assert_equal :initialized, connection.state

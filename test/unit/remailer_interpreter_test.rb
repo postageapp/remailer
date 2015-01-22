@@ -128,7 +128,7 @@ class RemailerInterpreterTest < Test::Unit::TestCase
 
     assert delegate.triggered
 
-    interpreter = Remailer::Interpreter.new(:delegate => delegate)
+    interpreter = Remailer::Interpreter.new(delegate: delegate)
     
     assert_equal nil, delegate.attribute
     assert_equal false, delegate.triggered[:method_no_args]
