@@ -104,4 +104,4 @@ release is made.
 
 ## Copyright
 
-Copyright (c) 2010-2013 Scott Tadman, The Working Group
+Copyright (c) 2010-2015 Scott Tadman, The Working Group

@@ -1,0 +1,114 @@
+#!/usr/bin/env ruby
+
+require 'eventmachine'
+require 'optparse'
+require 'securerandom'
+
+$LOAD_PATH << File.expand_path('../../lib', File.dirname(__FILE__))
+
+require 'remailer'
+
+# == Support Methods ========================================================
+
+class Exerciser
+  attr_reader :report
+
+  def initialize(options)
+    @options = options
+    @pending = [ ]
+    @report = { }
+  end
+
+  def test(server)
+    results = @report[server] = {
+      success: 0,
+      timeout: 0,
+      error: 0
+    }
+
+    @options[:count].times do
+      uuid = SecureRandom.uuid
+
+      @pending << uuid
+
+      connection_options = {
+        proxy: {
+          host: @options[:proxy_host],
+          port: @options[:proxy_port]
+        },
+        connect: lambda do |success, host|
+          results[success ? :success : :error] += 1
+          @pending.delete(uuid)
+        end
+      }
+
+      if (@options[:verbose])
+        connection_options[:debug] = STDOUT
+      end
+
+      Remailer::SMTP::Client.open(server, connection_options)
+    end
+  end
+
+  def done?
+    @pending.empty?
+  end
+end
+
+# == Main ===================================================================
+
+options = {
+  count: 1,
+  concurrency: 1,
+  proxy_host: 'localhost',
+  proxy_port: 1080
+}
+
+opts = OptionParser.new do |parser|
+  parser.banner = "Usage: exerciser [options] server [server [...]]"
+  parser.on('-n', '--count=n') do |n|
+    options[:count] = n.to_i
+  end
+  parser.on('-c', '--concurrency=n') do |n|
+    options[:concurrency] = n.to_i
+  end
+  parser.on('-X', '--proxy=s') do |s|
+    server, port = s.split(/:/)
+
+    options[:proxy_host] = server
+
+    if (port)
+      options[:proxy_port] = port.to_i
+    end
+  end
+  parser.on('-v', '--verbose') do
+    options[:verbose] = true
+  end
+end
+
+servers = opts.parse(*ARGV)
+
+unless (servers.any?)
+  puts opts
+  exit(0)
+end
+
+EventMachine.run do
+  exerciser = Exerciser.new(options)
+
+  servers.each do |server|
+    exerciser.test(server)
+  end
+
+  EventMachine.add_periodic_timer(0.1) do
+    if (exerciser.done?)
+      puts '%-40s %-6s %-6s' % [ 'Server', 'Success', 'Fail' ]
+      puts '-' * 58
+      exerciser.report.each do |server, results|
+        puts '%-40s %6d %6d' % [ server, results[:success], results[:error] ]
+      end
+
+      EventMachine.stop_event_loop
+    end
+  end
+end
