@@ -1,6 +1,6 @@
-require File.expand_path(File.join(*%w[ .. helper ]), File.dirname(__FILE__))
+require_relative '../helper'
 
-class RemailerIMAPClientInterpreterTest < Test::Unit::TestCase
+class RemailerIMAPClientInterpreterTest < MiniTest::Test
   def test_split_list_definition
     assert_mapping(
       '(\HasChildren \HasNoChildren) "/" "[Gmail]/All Mail"' =>

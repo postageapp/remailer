@@ -1,5 +1,7 @@
 require 'rubygems'
-require 'test/unit'
+
+gem 'minitest'
+require 'minitest/autorun'
 
 $LOAD_PATH.unshift(File.expand_path('../lib', File.dirname(__FILE__)))
 $LOAD_PATH.unshift(File.dirname(__FILE__))
@@ -51,7 +53,7 @@ module TestTriggerHelper
   end
 end
 
-class Test::Unit::TestCase
+class MiniTest::Test
   def engine
     exception = nil
     

@@ -1,4 +1,4 @@
-require File.expand_path(File.join(*%w[ .. helper ]), File.dirname(__FILE__))
+require_relative '../helper'
 
 class SOCKS5Delegate
   attr_reader :options
@@ -52,7 +52,7 @@ class SOCKS5Delegate
   end
 end
 
-class RemailerSOCKS5ClientInterpreterTest < Test::Unit::TestCase
+class RemailerSOCKS5ClientInterpreterTest < MiniTest::Test
   def test_defaults
     delegate = SOCKS5Delegate.new(
       proxy: {

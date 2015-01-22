@@ -1,4 +1,4 @@
-require File.expand_path(File.join(*%w[ .. helper ]), File.dirname(__FILE__))
+require_relative '../helper'
 
 class ExampleDelegate
   include TestTriggerHelper
@@ -105,7 +105,7 @@ class InterpreterWithAccessor < Remailer::Interpreter
   attr_accessor :example
 end
 
-class RemailerInterpreterTest < Test::Unit::TestCase
+class RemailerInterpreterTest < MiniTest::Test
   def test_default_state
     assert_equal [ :initialized, :terminated ], Remailer::Interpreter.states_defined.collect { |s| s.to_s }.sort.collect { |s| s.to_sym }
     assert_equal true, Remailer::Interpreter.state_defined?(:initialized)

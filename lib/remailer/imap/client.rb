@@ -192,7 +192,7 @@ class Remailer::IMAP::Client < Remailer::AbstractConnection
 protected
   # Switches to use the IMAP interpreter for all subsequent communication
   def use_imap_interpreter!
-    @interpreter = Interpreter.new(:delegate => self)
+    @interpreter = Interpreter.new(delegate: self)
   end
 
   def next_tag

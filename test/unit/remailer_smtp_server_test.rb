@@ -1,6 +1,6 @@
-require File.expand_path('../helper', File.dirname(__FILE__))
+require_relative '../helper'
 
-class RemailerSMTPServerTest < Test::Unit::TestCase
+class RemailerSMTPServerTest < MiniTest::Test
   def test_bind
     engine do
       server_port = 8025

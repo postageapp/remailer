@@ -1,4 +1,4 @@
-require File.expand_path(File.join(*%w[ .. helper ]), File.dirname(__FILE__))
+require_relative '../helper'
 
 class SMTPDelegate
   attr_accessor :options, :protocol, :active_message
@@ -62,7 +62,7 @@ class SMTPDelegate
   end
 end
 
-class RemailerSMTPClientInterpreterTest < Test::Unit::TestCase
+class RemailerSMTPClientInterpreterTest < MiniTest::Test
   def test_split_reply
     assert_mapping(
       '250 OK' => [ 250, 'OK' ],

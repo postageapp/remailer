@@ -1,6 +1,6 @@
-require File.expand_path(File.join(*%w[ .. helper ]), File.dirname(__FILE__))
+require_relative '../helper'
 
-class RemailerInterpreterStateTest < Test::Unit::TestCase
+class RemailerInterpreterStateTest < MiniTest::Test
   def test_defaults
     options = { }
     
