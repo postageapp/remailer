@@ -1,0 +1,15 @@
+smtp_server:
+  host: "smtp.gmail.com"
+  identifier: "smtp.gmail.com"
+
+public_smtp_server:
+  host: "smtp.gmail.com"
+  identifier: "mx.google.com"
+  username: "<account>@gmail.com"
+  password: "<password>"
+  port: 587
+
+proxy_server: "<proxy.server>"
+
+recipient: "<account>@gmail.com"
+sender: "<account>@gmail.com"

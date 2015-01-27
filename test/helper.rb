@@ -123,14 +123,4 @@ class MiniTest::Test
   end
 end
 
-require 'ostruct'
-
-TestConfig = OpenStruct.new
-
-config_file = File.expand_path("config.rb", File.dirname(__FILE__))
-
-if (File.exist?(config_file))
-  require config_file
-else
-  raise "No test/config.rb file found. Copy and modify test/config.example.rb"
-end
+require_relative 'config'

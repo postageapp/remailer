@@ -7,7 +7,7 @@ class RemailerSMTPClientTest < MiniTest::Test
       connected_host = nil
 
       connection = Remailer::SMTP::Client.open(
-        TestConfig.smtp_server[:host],
+        TestConfig.options[:smtp_server][:host],
         debug: STDERR, 
         connect: lambda { |success, host| connected_host = host }
       )
@@ -27,7 +27,7 @@ class RemailerSMTPClientTest < MiniTest::Test
         connection.closed?
       end
 
-      assert_equal TestConfig.smtp_server[:host], connected_host
+      assert_equal TestConfig.options[:smtp_server][:host], connected_host
 
       assert_equal true, after_complete_trigger
 
@@ -92,11 +92,11 @@ class RemailerSMTPClientTest < MiniTest::Test
       debug = { }
 
       connection = Remailer::SMTP::Client.open(
-        TestConfig.public_smtp_server[:host],
-        port: TestConfig.public_smtp_server[:port] || Remailer::SMTP::Client::SMTP_PORT,
+        TestConfig.options[:public_smtp_server][:host],
+        port: TestConfig.options[:public_smtp_server][:port] || Remailer::SMTP::Client::SMTP_PORT,
         debug: STDERR,
-        username: TestConfig.public_smtp_server[:username],
-        password: TestConfig.public_smtp_server[:password]
+        username: TestConfig.options[:public_smtp_server][:username],
+        password: TestConfig.options[:public_smtp_server][:password]
       )
 
       after_complete_trigger = false
@@ -113,7 +113,7 @@ class RemailerSMTPClientTest < MiniTest::Test
         connection.closed?
       end
 
-      assert_equal TestConfig.public_smtp_server[:identifier], connection.remote
+      assert_equal TestConfig.options[:public_smtp_server][:identifier], connection.remote
 
       assert_equal true, after_complete_trigger
 
@@ -128,11 +128,11 @@ class RemailerSMTPClientTest < MiniTest::Test
       debug = { }
 
       connection = Remailer::SMTP::Client.open(
-        TestConfig.smtp_server[:host],
+        TestConfig.options.smtp_server[:host],
         debug: STDERR,
         proxy: {
           proto: :socks5,
-          host: TestConfig.proxy_server
+          host: TestConfig.options.proxy_server
         }
       )
 
@@ -150,7 +150,7 @@ class RemailerSMTPClientTest < MiniTest::Test
         connection.closed?
       end
 
-      assert_equal TestConfig.smtp_server[:identifier], connection.remote
+      assert_equal TestConfig.options[:smtp_server][:identifier], connection.remote
 
       assert_equal true, after_complete_trigger
 
@@ -163,7 +163,7 @@ class RemailerSMTPClientTest < MiniTest::Test
   def test_connect_and_send_after_start
     engine do
       connection = Remailer::SMTP::Client.open(
-        TestConfig.smtp_server[:host],
+        TestConfig.options[:smtp_server][:host],
         debug: STDERR
       )
 
@@ -196,7 +196,7 @@ class RemailerSMTPClientTest < MiniTest::Test
   def test_connect_and_send_dotted_message
     engine do
       connection = Remailer::SMTP::Client.open(
-        TestConfig.smtp_server[:host],
+        TestConfig.options[:smtp_server][:host],
         debug: STDERR
       )
 
@@ -221,7 +221,7 @@ class RemailerSMTPClientTest < MiniTest::Test
   def test_connect_and_send_multiple
     engine do
       connection = Remailer::SMTP::Client.open(
-        TestConfig.smtp_server[:host],
+        TestConfig.options[:smtp_server][:host],
         debug: STDERR
       )
 
@@ -249,7 +249,7 @@ class RemailerSMTPClientTest < MiniTest::Test
   def test_connect_and_long_send
     engine do
       connection = Remailer::SMTP::Client.open(
-        TestConfig.smtp_server[:host],
+        TestConfig.options[:smtp_server][:host],
         debug: STDERR
       )
 
@@ -259,8 +259,8 @@ class RemailerSMTPClientTest < MiniTest::Test
       result_code = nil
 
       connection.send_email(
-        TestConfig.sender,
-        TestConfig.recipient,
+        TestConfig.options[:sender],
+        TestConfig.options[:recipient],
         example_message + 'a' * 100000
       ) do |c|
         callback_made = true
@@ -279,9 +279,9 @@ protected
   def example_message
     example = <<__END__
 Date: Sat, 13 Nov 2010 02:25:24 +0000
-From: #{TestConfig.sender}
-To: Remailer Test <#{TestConfig.receiver}>
-Message-Id: <hfLkcIByfjYoNIxCO7DMsxBTX9svsFHikIOfAiYy@#{TestConfig.sender.split(/@/).last}>
+From: #{TestConfig.options.sender}
+To: Remailer Test <#{TestConfig.options.receiver}>
+Message-Id: <hfLkcIByfjYoNIxCO7DMsxBTX9svsFHikIOfAiYy@#{TestConfig.options.sender.split(/@/).last}>
 Subject: Example Subject
 Mime-Version: 1.0
 Content-Type: text/plain

@@ -92,9 +92,10 @@ A status code of nil is sent if the server timed out or the connection failed.
 
 ## Tests
 
-In order to run tests, copy `test/config.example.rb` to `test/config.rb` and
+In order to run tests, copy `test/config.example.yml` to `test/config.yml` and
 adjust as required. For obvious reasons, passwords to SMTP test accounts are
-not included in the source code of this library.
+not included in the source code of this library. Any Gmail-type account should
+serve as a useful test target.
 
 ## Status
 

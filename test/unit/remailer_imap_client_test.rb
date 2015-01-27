@@ -6,11 +6,13 @@ class RemailerIMAPClientTest < MiniTest::Test
   end
   
   def test_connect
+    skip
+    
     engine do
       debug = { }
       
       client = Remailer::IMAP::Client.open(
-        TestConfig.imap_server[:host],
+        TestConfig.options[:imap_server][:host],
         debug: STDERR, 
         connect: lambda { |success, host| connected_host = host }
       )
@@ -37,7 +39,7 @@ class RemailerIMAPClientTest < MiniTest::Test
       
       login_status = nil
       
-      client.login(TestConfig.smtp_server[:username], TestConfig.smtp_server[:password]) do |status, message|
+      client.login(TestConfig.options[:smtp_server][:username], TestConfig.options[:smtp_server][:password]) do |status, message|
         login_status = status
       end
       

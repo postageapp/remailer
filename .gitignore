@@ -1,7 +1,7 @@
 *.gem
 /Gemfile.lock
 
-config.rb
+test/config.yml
 
 .DS_Store
 *.tmproj
@@ -13,4 +13,3 @@ tmtags
 coverage
 rdoc
 pkg
-
