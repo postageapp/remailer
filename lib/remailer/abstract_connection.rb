@@ -153,7 +153,15 @@ class Remailer::AbstractConnection < EventMachine::Connection
   rescue Object => e
     STDERR.puts "#{e.class}: #{e}"
   end
-  
+
+  def after_complete
+    if (block_given?)
+      @options[:after_complete] = Proc.new
+    elsif (@options[:after_complete])
+      @options[:after_complete].call
+    end
+  end
+
   # Returns true if the connection requires TLS support, or false otherwise.
   def use_tls?
     !!@options[:use_tls]
