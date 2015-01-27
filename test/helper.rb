@@ -52,35 +52,59 @@ module TestTriggerHelper
 end
 
 class MiniTest::Test
+  def debug_channel
+    ENV['DEBUG'] ? STDERR : nil
+  end
+
   def engine
     exception = nil
+    test_thread = nil
     
-    ThreadsWait.all_waits(
+    engine_thread =
       Thread.new do
         Thread.abort_on_exception = true
 
         # Create a thread for the engine to run on
         begin
           EventMachine.run
+
         rescue Object => exception
         end
-      end,
+      end
+
+    test_thread =
       Thread.new do
         # Execute the test code in a separate thread to avoid blocking
         # the EventMachine loop.
         begin
+          while (!EventMachine.reactor_running?)
+            # Wait impatiently.
+          end
+
           yield
         rescue Object => exception
         ensure
           begin
             EventMachine.stop_event_loop
           rescue Object
+            STDERR.puts("[#{exception.class}] #{exception}")
             # Shutting down may trigger an exception from time to time
             # if the engine itself has failed.
           end
         end
       end
-    )
+
+    test_thread.join
+
+    begin
+      Timeout.timeout(1) do
+        engine_thread.join
+      end
+    rescue Timeout::Error
+      engine_thread.kill
+
+      fail 'Execution timed out'
+    end
     
     if (exception)
       raise exception

@@ -8,7 +8,7 @@ class RemailerSMTPClientTest < MiniTest::Test
 
       connection = Remailer::SMTP::Client.open(
         TestConfig.options[:public_smtp_server][:host],
-        debug: STDERR, 
+        debug: self.debug_channel, 
         connect: lambda { |success, host| connected_host = host }
       )
 
@@ -45,7 +45,7 @@ class RemailerSMTPClientTest < MiniTest::Test
 
       connection = Remailer::SMTP::Client.open(
         'example.com',
-        debug: STDERR,
+        debug: self.debug_channel,
         error: lambda { |code, message|
           error_received = [ code, message ]
         },
@@ -72,7 +72,7 @@ class RemailerSMTPClientTest < MiniTest::Test
 
       connection = Remailer::SMTP::Client.open(
         'invalid-example-domain--x.com',
-        debug: STDERR,
+        debug: self.debug_channel,
         error: lambda { |code, message|
           error_received = [ code, message ]
         },
@@ -94,7 +94,7 @@ class RemailerSMTPClientTest < MiniTest::Test
       connection = Remailer::SMTP::Client.open(
         TestConfig.options[:smtp_server][:host],
         port: TestConfig.options[:smtp_server][:port] || Remailer::SMTP::Client::SMTP_PORT,
-        debug: STDERR,
+        debug: self.debug_channel,
         username: TestConfig.options[:smtp_server][:username],
         password: TestConfig.options[:smtp_server][:password]
       )
@@ -129,7 +129,7 @@ class RemailerSMTPClientTest < MiniTest::Test
 
       connection = Remailer::SMTP::Client.open(
         TestConfig.options[:public_smtp_server][:host],
-        debug: STDERR,
+        debug: self.debug_channel,
         proxy: {
           proto: :socks5,
           host: TestConfig.options[:proxy_server]
@@ -164,7 +164,7 @@ class RemailerSMTPClientTest < MiniTest::Test
     engine do
       connection = Remailer::SMTP::Client.open(
         TestConfig.options[:public_smtp_server][:host],
-        debug: STDERR
+        debug: self.debug_channel
       )
 
       assert_equal :initialized, connection.state
@@ -197,7 +197,7 @@ class RemailerSMTPClientTest < MiniTest::Test
     engine do
       connection = Remailer::SMTP::Client.open(
         TestConfig.options[:public_smtp_server][:host],
-        debug: STDERR
+        debug: self.debug_channel
       )
 
       assert_equal :initialized, connection.state
@@ -222,7 +222,7 @@ class RemailerSMTPClientTest < MiniTest::Test
     engine do
       connection = Remailer::SMTP::Client.open(
         TestConfig.options[:public_smtp_server][:host],
-        debug: STDERR
+        debug: self.debug_channel
       )
 
       assert_equal :initialized, connection.state
@@ -253,7 +253,7 @@ class RemailerSMTPClientTest < MiniTest::Test
     engine do
       connection = Remailer::SMTP::Client.open(
         TestConfig.options[:public_smtp_server][:host],
-        debug: STDERR
+        debug: self.debug_channel
       )
 
       assert_equal :initialized, connection.state
