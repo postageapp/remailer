@@ -1,9 +1,15 @@
 require_relative '../helper'
 
 class RemailerSMTPServerTest < MiniTest::Test
+  def random_server_port
+    @server_port ||= 9000 + rand(4096)
+
+    @server_port += 1
+  end
+
   def test_bind
     engine do
-      server_port = 8025
+      server_port = random_server_port
       
       server = Remailer::SMTP::Server.bind(nil, server_port)
       
@@ -13,7 +19,7 @@ class RemailerSMTPServerTest < MiniTest::Test
 
   def test_connect
     engine do
-      server_port = 8025
+      server_port = random_server_port
 
       remote_ip = nil
     
@@ -30,7 +36,7 @@ class RemailerSMTPServerTest < MiniTest::Test
       client = Remailer::SMTP::Client.open(
         'localhost',
         port: server_port,
-        debug: STDERR, 
+        debug: self.debug_channel, 
         connect: lambda { |success, host| connected_host = host }
       )
       
@@ -45,7 +51,7 @@ class RemailerSMTPServerTest < MiniTest::Test
 
   def test_transaction
     engine do
-      server_port = 8025
+      server_port = random_server_port
 
       transaction = nil
     
@@ -62,7 +68,7 @@ class RemailerSMTPServerTest < MiniTest::Test
       client = Remailer::SMTP::Client.open(
         'localhost',
         port: server_port,
-        debug: STDERR
+        debug: self.debug_channel
       )
       
       sender = 'sender@example.com'.freeze

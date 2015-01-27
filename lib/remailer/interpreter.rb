@@ -32,8 +32,7 @@ class Remailer::Interpreter
   # options. The default keys are :initialized and :terminated.
   def self.states
     @states ||=
-      case (superclass.respond_to?(:states))
-      when true
+      if (superclass.respond_to?(:states))
         superclass.states.dup
       else
         {

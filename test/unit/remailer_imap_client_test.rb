@@ -1,10 +1,6 @@
 require_relative '../helper'
 
 class RemailerIMAPClientTest < MiniTest::Test
-  def setup
-    STDERR.sync = true
-  end
-  
   def test_connect
     skip
     
@@ -13,7 +9,7 @@ class RemailerIMAPClientTest < MiniTest::Test
       
       client = Remailer::IMAP::Client.open(
         TestConfig.options[:imap_server][:host],
-        debug: STDERR, 
+        debug: self.debug_channel, 
         connect: lambda { |success, host| connected_host = host }
       )
       

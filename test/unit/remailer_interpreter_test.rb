@@ -107,13 +107,17 @@ end
 
 class RemailerInterpreterTest < MiniTest::Test
   def test_default_state
-    assert_equal [ :initialized, :terminated ], Remailer::Interpreter.states_defined.collect { |s| s.to_s }.sort.collect { |s| s.to_sym }
-    assert_equal true, Remailer::Interpreter.state_defined?(:initialized)
-    assert_equal true, Remailer::Interpreter.state_defined?(:terminated)
-    assert_equal false, Remailer::Interpreter.state_defined?(:unknown)
+    test_interpreter_class = Class.new(Remailer::Interpreter)
 
-    interpreter = Remailer::Interpreter.new
-    
+    assert_equal [ :initialized, :terminated ], test_interpreter_class.states_defined.collect { |s| s.to_s }.sort.collect { |s| s.to_sym }
+    assert_equal true, test_interpreter_class.state_defined?(:initialized)
+    assert_equal true, test_interpreter_class.state_defined?(:terminated)
+    assert_equal false, test_interpreter_class.state_defined?(:unknown)
+
+    assert_equal [ :initialized, :terminated ], test_interpreter_class.states_defined
+
+    interpreter = test_interpreter_class.new
+
     assert_equal :initialized, interpreter.state
     
     buffer = 'a'
@@ -124,11 +128,13 @@ class RemailerInterpreterTest < MiniTest::Test
   end
   
   def test_delegate
+    test_interpreter_class = Class.new(Remailer::Interpreter)
+    
     delegate = ExampleDelegate.new
 
     assert delegate.triggered
 
-    interpreter = Remailer::Interpreter.new(delegate: delegate)
+    interpreter = test_interpreter_class.new(delegate: delegate)
     
     assert_equal nil, delegate.attribute
     assert_equal false, delegate.triggered[:method_no_args]

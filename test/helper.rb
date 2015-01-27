@@ -51,6 +51,10 @@ module TestTriggerHelper
   end
 end
 
+if (ENV['DEBUG'])
+  STDERR.sync = true
+end
+
 class MiniTest::Test
   def debug_channel
     ENV['DEBUG'] ? STDERR : nil
@@ -113,6 +117,7 @@ class MiniTest::Test
   
   def assert_timeout(time, message = nil, &block)
     Timeout::timeout(time, &block)
+
   rescue Timeout::Error
     flunk(message || 'assert_timeout timed out')
   end
