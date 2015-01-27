@@ -1,5 +1,19 @@
 require_relative '../helper'
 
+class RegexpInterpreter < Remailer::Interpreter
+  attr_reader :received
+  
+  state :initialized do
+    interpret(/^HELO\s+/) do |line|
+      @received = [ :helo, line ]
+    end
+
+    interpret(/^MAIL FROM:<([^>]+)>/) do |line|
+      @received = [ :mail_from, line ]
+    end
+  end
+end
+
 class ExampleDelegate
   include TestTriggerHelper
   
@@ -43,20 +57,6 @@ end
 class LineInterpreterSubclass < LineInterpreter
   parse(/^.*?\0/) do |data|
     data.sub(/\0$/, '')
-  end
-end
-
-class RegexpInterpreter < Remailer::Interpreter
-  attr_reader :received
-  
-  state :initialized do
-    interpret(/^HELO\s+/) do |line|
-      @received = [ :helo, line ]
-    end
-
-    interpret(/^MAIL FROM:<([^>]+)>/) do |line|
-      @received = [ :mail_from, line ]
-    end
   end
 end
 
@@ -108,6 +108,8 @@ end
 class RemailerInterpreterTest < MiniTest::Test
   def test_default_state
     test_interpreter_class = Class.new(Remailer::Interpreter)
+
+    assert test_interpreter_class.states_empty?
 
     assert_equal [ :initialized, :terminated ], test_interpreter_class.states_defined.collect { |s| s.to_s }.sort.collect { |s| s.to_sym }
     assert_equal true, test_interpreter_class.state_defined?(:initialized)

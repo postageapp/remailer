@@ -27,7 +27,23 @@ class Remailer::Interpreter
   def self.initial_state=(state)
     @initial_state = state
   end
+
+  def self.config
+    {
+      states: @states,
+      default_interpreter: @default,
+      default_parser: @parser,
+      on_error_handler: @on_error
+    }
+  end
   
+  def self.states_default
+    {
+        :initialized => { },
+        :terminated => { }
+      }
+  end
+
   # Returns the states that are defined as a has with their associated
   # options. The default keys are :initialized and :terminated.
   def self.states
@@ -35,11 +51,12 @@ class Remailer::Interpreter
       if (superclass.respond_to?(:states))
         superclass.states.dup
       else
-        {
-          :initialized => { },
-          :terminated => { }
-        }
+        self.states_default
       end
+  end
+
+  def self.states_empty?
+    self.states == self.states_default
   end
   
   # Returns true if a given state is defined, false otherwise.
@@ -113,8 +130,7 @@ class Remailer::Interpreter
   # Returns the parser used when no state-specific parser has been defined.
   def self.default_parser
     @parser ||=
-      case (superclass.respond_to?(:default_parser))
-      when true
+      if (superclass.respond_to?(:default_parser))
         superclass.default_parser
       else
         lambda { |s| _s = s.dup; s.replace(''); _s }
@@ -124,8 +140,7 @@ class Remailer::Interpreter
   # Returns the current default_interpreter.
   def self.default_interpreter
     @default ||=
-      case (superclass.respond_to?(:default_interpreter))
-      when true
+      if (superclass.respond_to?(:default_interpreter))
         superclass.default_interpreter
       else
         nil
@@ -135,8 +150,7 @@ class Remailer::Interpreter
   # Returns the defined error handler
   def self.on_error_handler
     @on_error ||=
-      case (superclass.respond_to?(:on_error_handler))
-      when true
+      if (superclass.respond_to?(:on_error_handler))
         superclass.on_error_handler
       else
         nil
