@@ -151,7 +151,9 @@ class Remailer::AbstractConnection < EventMachine::Connection
     self.after_initialize
     
   rescue Object => e
-    STDERR.puts "#{e.class}: #{e}"
+    report_exception(e)
+
+    STDERR.puts "#{e.class}: #{e}" rescue nil
   end
 
   def after_complete
@@ -252,7 +254,8 @@ class Remailer::AbstractConnection < EventMachine::Connection
     end
     
   rescue Object => e
-    STDERR.puts("[#{e.class}] #{e}")
+    self.report_exception(e)
+    STDERR.puts("[#{e.class}] #{e}") rescue nil
 
     raise e
   end
