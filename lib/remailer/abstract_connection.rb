@@ -83,7 +83,7 @@ class Remailer::AbstractConnection < EventMachine::Connection
     EventMachine.connect(host_name, host_port, self, options)
 
   rescue EventMachine::ConnectionError => e
-    report_exception(e, options)
+    self.report_exception(e, options)
 
     false
   end
@@ -151,7 +151,7 @@ class Remailer::AbstractConnection < EventMachine::Connection
     self.after_initialize
     
   rescue Object => e
-    report_exception(e)
+    self.class.report_exception(e, @options)
 
     STDERR.puts "#{e.class}: #{e}" rescue nil
   end
@@ -254,7 +254,7 @@ class Remailer::AbstractConnection < EventMachine::Connection
     end
     
   rescue Object => e
-    self.report_exception(e)
+    self.class.report_exception(e, @options)
     STDERR.puts("[#{e.class}] #{e}") rescue nil
 
     raise e
