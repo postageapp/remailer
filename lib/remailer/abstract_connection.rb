@@ -237,11 +237,11 @@ class Remailer::AbstractConnection < EventMachine::Connection
 
   # This implements the EventMachine::Connection#receive_data method that
   # is called each time new data is received from the socket.
-  def receive_data(data)
+  def receive_data(data = nil)
     reset_timeout!
 
     @buffer ||= ''
-    @buffer << data
+    @buffer << data if (data)
 
     if (interpreter = @interpreter)
       interpreter.process(@buffer) do |reply|

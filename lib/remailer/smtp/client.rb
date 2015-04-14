@@ -216,6 +216,10 @@ class Remailer::SMTP::Client < Remailer::AbstractConnection
   # Switches to use the SMTP interpreter for all subsequent communication
   def use_smtp_interpreter!
     @interpreter = Interpreter.new(delegate: self)
+
+    # Trigger processing using the new interpreter as some SMTP data might
+    # already be buffered by this point.
+    receive_data
   end
 
   # Callback receiver for when the proxy connection has been completed.
