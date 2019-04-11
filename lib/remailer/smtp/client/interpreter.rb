@@ -37,6 +37,10 @@ class Remailer::SMTP::Client::Interpreter < Remailer::Interpreter
   end
   
   state :initialized do
+    enter do
+      @tls = false
+    end
+
     interpret(220) do |message, continues|
       message_parts = message.split(/\s+/)
       delegate.remote = message_parts.first

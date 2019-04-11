@@ -138,7 +138,7 @@ class RemailerInterpreterTest < MiniTest::Test
 
     interpreter = test_interpreter_class.new(delegate: delegate)
     
-    assert_equal nil, delegate.attribute
+    assert_nil delegate.attribute
     assert_equal false, delegate.triggered[:method_no_args]
     assert_equal false, delegate.triggered[:method_with_args]
     
@@ -236,7 +236,7 @@ class RemailerInterpreterTest < MiniTest::Test
     
     interpreter.process(line)
     
-    assert_equal nil, interpreter.lines[-1]
+    assert_nil interpreter.lines[-1]
     assert_equal "TEST", line
     
     line << "\0"
@@ -250,7 +250,7 @@ class RemailerInterpreterTest < MiniTest::Test
   def test_regexp_interpreter
     interpreter = RegexpInterpreter.new
     
-    assert_equal nil, interpreter.received
+    assert_nil interpreter.received
     
     line = "HELO example.com"
     
@@ -277,7 +277,7 @@ class RemailerInterpreterTest < MiniTest::Test
     assert_equal true, interpreter.interpret(:random)
     
     assert_equal :branch, interpreter.state
-    assert_equal nil, interpreter.error
+    assert_nil interpreter.error
     
     assert_equal :random, interpreter.reply
   end
@@ -299,7 +299,7 @@ class RemailerInterpreterTest < MiniTest::Test
   def test_new_with_block
     interpreter = InterpreterWithAccessor.new
     
-    assert_equal nil, interpreter.example
+    assert_nil interpreter.example
 
     interpreter = InterpreterWithAccessor.new do |interpreter|
       interpreter.example = 'example'

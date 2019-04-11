@@ -8,6 +8,9 @@ class SMTPDelegate
     @sent = [ ]
     @options = options
     @protocol = :smtp
+    @started_tls = false
+    @tls_support = nil
+    @closed = false
   end
   
   def hostname
@@ -122,7 +125,7 @@ class RemailerSMTPClientInterpreterTest < MiniTest::Test
     delegate = SMTPDelegate.new
 
     assert_equal false, delegate.closed?
-    assert_equal nil, delegate.read
+    assert_nil delegate.read
     assert_equal 0, delegate.size
   end
 

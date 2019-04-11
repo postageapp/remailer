@@ -3,7 +3,6 @@ require_relative '../helper'
 class RemailerSMTPClientTest < MiniTest::Test
   def test_connect
     engine do
-      debug = { }
       connected_host = nil
 
       connection = Remailer::SMTP::Client.open(
@@ -31,7 +30,7 @@ class RemailerSMTPClientTest < MiniTest::Test
 
       assert_equal true, after_complete_trigger
 
-      assert_equal 35882577, connection.max_size
+      assert_equal 157286400, connection.max_size
       assert_equal :esmtp, connection.protocol
       assert_equal true, connection.tls_support?
     end
@@ -70,7 +69,7 @@ class RemailerSMTPClientTest < MiniTest::Test
     engine do
       error_received = nil
 
-      connection = Remailer::SMTP::Client.open(
+      Remailer::SMTP::Client.open(
         'invalid-example-domain--x.com',
         debug: self.debug_channel,
         error: lambda { |code, message|
@@ -89,8 +88,6 @@ class RemailerSMTPClientTest < MiniTest::Test
 
   def test_connect_with_auth
     engine do
-      debug = { }
-
       connection = Remailer::SMTP::Client.open(
         TestConfig.options[:smtp_server][:host],
         port: TestConfig.options[:smtp_server][:port] || Remailer::SMTP::Client::SMTP_PORT,
@@ -113,7 +110,7 @@ class RemailerSMTPClientTest < MiniTest::Test
         connection.closed?
       end
 
-      assert_equal TestConfig.options[:public_smtp_server][:identifier], connection.remote
+      assert_equal TestConfig.options[:smtp_server][:identifier], connection.remote
 
       assert_equal true, after_complete_trigger
 
@@ -125,8 +122,6 @@ class RemailerSMTPClientTest < MiniTest::Test
 
   def test_connect_via_proxy
     engine do
-      debug = { }
-
       connection = Remailer::SMTP::Client.open(
         TestConfig.options[:public_smtp_server][:host],
         debug: self.debug_channel,
@@ -154,7 +149,7 @@ class RemailerSMTPClientTest < MiniTest::Test
 
       assert_equal true, after_complete_trigger
 
-      assert_equal 35882577, connection.max_size
+      assert_equal 157286400, connection.max_size
       assert_equal :esmtp, connection.protocol
       assert_equal true, connection.tls_support?
     end

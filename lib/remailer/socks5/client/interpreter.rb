@@ -60,7 +60,7 @@ class Remailer::SOCKS5::Client::Interpreter < Remailer::Interpreter
     
     parse do |s|
       if (s.length >= 2)
-        version, method = s.slice!(0,2).unpack('CC')
+        _version, method = s.slice!(0,2).unpack('CC')
       
         method
       end
@@ -109,7 +109,7 @@ class Remailer::SOCKS5::Client::Interpreter < Remailer::Interpreter
     
     parse do |s|
       if (s.length >= 10)
-        version, reply, reserved, address_type, address, port = s.slice!(0,10).unpack('CCCCNn')
+        _version, reply, _reserved, address_type, address, port = s.slice!(0,10).unpack('CCCCNn')
       
         [
           reply,

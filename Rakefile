@@ -6,21 +6,26 @@ require 'bundler/setup'
 Bundler.require
 
 begin
-  require 'jeweler'
+  require 'juwelier'
 
-  Jeweler::Tasks.new do |gem|
+  Juwelier::Tasks.new do |gem|
     gem.name = "remailer"
     gem.summary = %Q{Reactor-Ready SMTP Mailer}
-    gem.description = %Q{EventMachine SMTP Mail User Agent}
-    gem.email = "scott@twg.ca"
-    gem.homepage = "http://github.com/twg/remailer"
+    gem.description = %Q{EventMachine Mail Agent for SMTP and IMAP}
+    gem.email = "tadman@postageapp.com"
+    gem.homepage = "http://github.com/postageapp/remailer"
     gem.authors = [ "Scott Tadman" ]
+
+    gem.files.exclude(
+      '.travis.yml',
+      'test/config.yml.enc'
+    )
   end
 
-  Jeweler::GemcutterTasks.new
+  Juwelier::GemcutterTasks.new
 
 rescue LoadError
-  puts "Jeweler (or a dependency) not available. Install it with: gem install jeweler"
+  puts "Juwelier (or a dependency) not available. Install it with: gem install Juwelier"
 end
 
 require 'rake/testtask'
@@ -31,4 +36,4 @@ Rake::TestTask.new(:test) do |test|
   test.verbose = true
 end
 
-task :default => :test
+task default: :test

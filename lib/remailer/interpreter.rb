@@ -19,7 +19,7 @@ class Remailer::Interpreter
   
   # Defines the initial state for objects of this class.
   def self.initial_state
-    @initial_state || :initialized
+    @initial_state ||= :initialized
   end
   
   # Can be used to reassign the initial state for this class. May be easier
@@ -82,15 +82,15 @@ class Remailer::Interpreter
   end
   
   # This is a method to convert a spec and a block into a proper parser
-  # method. If spec is specified, it should be a Fixnum, or a Regexp. A 
-  # Fixnum defines a minimum size to process, useful for packed binary
+  # method. If spec is specified, it should be a Integer, or a Regexp. A 
+  # Integer defines a minimum size to process, useful for packed binary
   # streams, while a Regexp defines a pattern that must match before the
   # parser is engaged.
   def self.create_parser_for_spec(spec, &block)
     case (spec)
     when nil
       block
-    when Fixnum
+    when Integer
       lambda do |s|
         if (s.length >= spec)
           part = s.slice!(0, spec)
@@ -168,6 +168,8 @@ class Remailer::Interpreter
   # before the first state is entered.
   def initialize(options = nil)
     @delegate = (options and options[:delegate])
+    @state = nil
+    @error = nil
     
     yield(self) if (block_given?)
     
@@ -258,7 +260,7 @@ class Remailer::Interpreter
           match_result = match_result.to_a
         
           if (match_result.length > 1)
-            match_string = match_result.shift
+            match_result.shift
             args[0, 1] = match_result
           else
             args[0].sub!(match_result[0], '')

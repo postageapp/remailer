@@ -60,6 +60,8 @@ class Remailer::SMTP::Client < Remailer::AbstractConnection
   # Called by AbstractConnection at the end of the initialize procedure
   def after_initialize
     @protocol = :smtp
+    @error = nil
+    @tls_support = nil
 
     if (using_proxy?)
       proxy_connection_initiated!

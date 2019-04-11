@@ -5,7 +5,7 @@ class Remailer::SMTP::Server::Transaction
 
   # == Properties ===========================================================
   
-  attr_accessor *ATTRIBUTES
+  attr_accessor(*ATTRIBUTES)
 
   # == Class Methods ========================================================
 

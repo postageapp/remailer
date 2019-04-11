@@ -60,6 +60,10 @@ class Remailer::SMTP::Server < EventMachine::Protocols::LineAndTextProtocol
     
     @server_name = @options[:server_name] || self.class.hostname(@local_ip) || @local_ip
 
+    @logger = nil
+    @remote_host = nil
+    @tls_support = false
+
     log(:debug, "Connection from #{@remote_ip}:#{@remote_port} to #{@local_ip}:#{@local_port}")
     
     @on_transaction = @options[:on_transaction]

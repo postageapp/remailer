@@ -41,8 +41,6 @@ end
 module TestTriggerHelper
   def self.included(base)
     base.class_eval do
-      attr_reader :triggered
-      
       def triggered
         @triggered ||= Hash.new(false)
       end
@@ -138,12 +136,12 @@ class MiniTest::Test
   end
 
   def assert_mapping(map, &block)
-    result_map = map.inject({ }) do |h, (k,v)|
+    result_map = map.inject({ }) do |h, (k, _v)|
       h[k] = yield(k)
       h
     end
     
-    differences = result_map.inject([ ]) do |a, (k,v)|
+    differences = result_map.inject([ ]) do |a, (k, v)|
       if (v != map[k])
         a << k
       end

@@ -6,6 +6,7 @@ class SOCKS5Delegate
   def initialize(options = nil)
     @sent = [ ]
     @options = (options or { })
+    @closed = false
   end
   
   def resolve_hostname(hostname)

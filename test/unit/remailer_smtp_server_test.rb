@@ -24,7 +24,7 @@ class RemailerSMTPServerTest < MiniTest::Test
       remote_ip = nil
     
       server = Remailer::SMTP::Server.bind(
-        nil,
+        '127.0.0.1',
         server_port,
         on_connect: lambda { |_remote_ip| remote_ip = _remote_ip }
       )
@@ -34,11 +34,13 @@ class RemailerSMTPServerTest < MiniTest::Test
       connected_host = nil
 
       client = Remailer::SMTP::Client.open(
-        'localhost',
+        '127.0.0.1',
         port: server_port,
         debug: self.debug_channel, 
         connect: lambda { |success, host| connected_host = host }
       )
+
+      assert client
       
       assert_eventually(30) do
         connected_host
@@ -56,17 +58,15 @@ class RemailerSMTPServerTest < MiniTest::Test
       transaction = nil
     
       server = Remailer::SMTP::Server.bind(
-        nil,
+        '127.0.0.1',
         server_port,
         on_transaction: lambda { |_transaction| transaction = _transaction }
       )
     
       assert server
       
-      connected_host = nil
-
       client = Remailer::SMTP::Client.open(
-        'localhost',
+        '127.0.0.1',
         port: server_port,
         debug: self.debug_channel
       )

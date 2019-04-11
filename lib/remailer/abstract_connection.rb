@@ -133,6 +133,14 @@ class Remailer::AbstractConnection < EventMachine::Connection
     @options = options
     @hostname = @options[:hostname] || Socket.gethostname
     @timeout = @options[:timeout] || self.class.default_timeout
+    @timed_out = false
+
+    @active_message = nil
+    @established = false
+    @connected = false
+    @closed = false
+    @unbound = false
+    @connecting_to_proxy = false
 
     @messages = [ ]
   
@@ -380,12 +388,6 @@ class Remailer::AbstractConnection < EventMachine::Connection
   # Returns true if an error has occurred, false otherwise.
   def error?
     !!@error
-  end
-  
-  # EventMachine: Enables TLS support on the connection.
-  def start_tls
-    debug_notification(:tls, "Started")
-    super
   end
 
   # EventMachine: Closes down the connection.
