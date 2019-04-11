@@ -63,6 +63,7 @@ class Remailer::SMTP::Server < EventMachine::Protocols::LineAndTextProtocol
     @logger = nil
     @remote_host = nil
     @tls_support = false
+    @interpreter_class = options && options[:interpreter] || Interpreter
 
     log(:debug, "Connection from #{@remote_ip}:#{@remote_port} to #{@local_ip}:#{@local_port}")
     
@@ -73,7 +74,7 @@ class Remailer::SMTP::Server < EventMachine::Protocols::LineAndTextProtocol
   def post_init
     super
 
-    @interpreter = Interpreter.new(delegate: self)
+    @interpreter = @interpreter_class.new(delegate: self)
     
     if (@on_connect)
       @on_connect.call(@remote_ip)
