@@ -105,4 +105,4 @@ release is made.
 
 ## Copyright
 
-Copyright (c) 2010-2015 Scott Tadman, The Working Group
+Copyright (c) 2010-2019 Scott Tadman, PostageApp Ltd.
