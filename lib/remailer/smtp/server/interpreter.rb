@@ -142,6 +142,8 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
   
   state :data do
     interpret(/^\.$/) do
+      @transaction.remote_ip = delegate.remote_ip
+      
       accept, message = will_accept_transaction(@transaction)
       
       if (accept)

@@ -1,7 +1,14 @@
 class Remailer::SMTP::Server::Transaction
   # == Constants ============================================================
   
-  ATTRIBUTES = [ :sender, :recipients, :data ].freeze
+  ATTRIBUTES = [
+    :sender,
+    :remote_ip,
+    :remote_name,
+    :auth,
+    :recipients,
+    :data
+  ].freeze
 
   # == Properties ===========================================================
   

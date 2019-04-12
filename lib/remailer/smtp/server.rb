@@ -19,7 +19,7 @@ class Remailer::SMTP::Server < EventMachine::Protocols::LineAndTextProtocol
   
   attr_accessor :logger
   attr_reader :server_name, :quirks
-  attr_reader :remote_ip, :remote_port
+  attr_reader :remote_ip, :remote_port, :remote_name
   attr_reader :local_ip, :local_port
   attr_reader :local_config
   
