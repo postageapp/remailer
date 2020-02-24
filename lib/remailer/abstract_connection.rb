@@ -164,9 +164,9 @@ class Remailer::AbstractConnection < EventMachine::Connection
     STDERR.puts "#{e.class}: #{e}" rescue nil
   end
 
-  def after_complete
+  def after_complete(&block)
     if (block_given?)
-      @options[:after_complete] = Proc.new
+      @options[:after_complete] = block
     elsif (@options[:after_complete])
       @options[:after_complete].call
     end

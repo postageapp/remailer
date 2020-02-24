@@ -81,8 +81,8 @@ class Remailer::SMTP::Server < EventMachine::Protocols::LineAndTextProtocol
     end
   end
   
-  def on_transaction
-    @on_transaction = Proc.new
+  def on_transaction(&block)
+    @on_transaction = block
   end
   
   def receive_line(line)
