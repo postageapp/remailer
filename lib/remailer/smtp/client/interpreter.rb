@@ -1,3 +1,6 @@
+require 'base64'
+require 'set'
+
 class Remailer::SMTP::Client::Interpreter < Remailer::Interpreter
   # == Constants ============================================================
   
@@ -72,6 +75,8 @@ class Remailer::SMTP::Client::Interpreter < Remailer::Interpreter
   state :helo do
     enter do
       delegate.send_line("HELO #{delegate.hostname}")
+
+      delegate.auth_support = Set.new(%i[ plain ])
     end
 
     interpret(250) do
@@ -89,20 +94,17 @@ class Remailer::SMTP::Client::Interpreter < Remailer::Interpreter
     end
 
     interpret(250) do |message, continues|
-      message_parts = message.split(/\s+/)
+      directive, *message_parts = message.split(/\s+/)
 
-      case (message_parts[0].to_s.upcase)
+      case (directive.to_s.upcase)
       when 'SIZE'
-        delegate.max_size = message_parts[1].to_i
+        delegate.max_size = message_parts[0].to_i
       when 'PIPELINING'
         delegate.pipelining = true
       when 'STARTTLS'
         delegate.tls_support = true
       when 'AUTH'
-        delegate.auth_support = message_parts[1, message_parts.length].inject({ }) do |h, v|
-          h[v] = true
-          h
-        end
+        delegate.auth_support = Set.new(message_parts.map(&:downcase).map(&:to_sym))
       end
 
       unless (continues)
@@ -144,7 +146,19 @@ class Remailer::SMTP::Client::Interpreter < Remailer::Interpreter
 
   state :auth do
     enter do
-      delegate.send_line("AUTH PLAIN #{self.class.encode_authentication(delegate.options[:username], delegate.options[:password])}")
+      if (delegate.auth_support?(:plain))
+        delegate.send_line(
+          'AUTH PLAIN %s' % [ 
+            self.class.encode_authentication(
+              delegate.options[:username],
+              delegate.options[:password]
+            )
+          ]
+        )
+      elsif (delegate.auth_support&.include?(:login))
+        delegate.send_line('AUTH LOGIN')
+        enter_state(:auth_username)
+      end
     end
     
     interpret(235) do
@@ -162,7 +176,62 @@ class Remailer::SMTP::Client::Interpreter < Remailer::Interpreter
       end
     end
   end
-  
+
+  state :auth_username do
+    interpret(334) do
+      delegate.send_line(Base64.strict_encode64(delegate.options[:username]))
+
+      enter_state(:auth_password)
+    end
+
+    interpret(535) do |reply_message, continues|
+      handle_reply_continuation(535, reply_message, continues) do |reply_code, reply_message|
+        @error = reply_message
+
+        delegate.debug_notification(:error, "[#{@state}] #{reply_code} #{reply_message}")
+        delegate.error_notification(reply_code, reply_message)
+
+        enter_state(:quit)
+      end
+    end
+  end
+
+  state :auth_password do
+    interpret(334) do
+      delegate.send_line(Base64.strict_encode64(delegate.options[:password]))
+
+      enter_state(:auth_acknowledge)
+    end
+
+    interpret(535) do |reply_message, continues|
+      handle_reply_continuation(535, reply_message, continues) do |reply_code, reply_message|
+        @error = reply_message
+
+        delegate.debug_notification(:error, "[#{@state}] #{reply_code} #{reply_message}")
+        delegate.error_notification(reply_code, reply_message)
+
+        enter_state(:quit)
+      end
+    end
+  end
+
+  state :auth_acknowledge do
+    interpret(235) do
+      enter_state(:established)
+    end
+
+    interpret(535) do |reply_message, continues|
+      handle_reply_continuation(535, reply_message, continues) do |reply_code, reply_message|
+        @error = reply_message
+
+        delegate.debug_notification(:error, "[#{@state}] #{reply_code} #{reply_message}")
+        delegate.error_notification(reply_code, reply_message)
+
+        enter_state(:quit)
+      end
+    end
+  end
+
   state :established do
     enter do
       delegate.connect_notification(true)

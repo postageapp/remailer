@@ -184,9 +184,15 @@ class Remailer::AbstractConnection < EventMachine::Connection
   end
 
   # Returns true if the connection has advertised authentication support, or
-  # false if not availble or could not be detected.
-  def auth_support?
-    !!@auth_support
+  # false if not availble or could not be detected. If type is specified,
+  # returns true only if that type is supported, false otherwise.
+  def auth_support?(type = nil)
+    case (type)
+    when nil
+      !!@auth_support
+    else
+      !!(@auth_support&.include?(type))
+    end
   end
   
   # Returns true if the connection will be using a proxy to connect, false
