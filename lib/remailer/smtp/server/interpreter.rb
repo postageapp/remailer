@@ -40,7 +40,7 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
       end
     end
 
-    interpret(/^\s*HELO\s+(\S+)\s*$/) do |remote_host|
+    interpret(/^\s*HELO\s+(\S+)\s*$/i) do |remote_host|
       delegate.validate_hostname(remote_host) do |valid|
         if (valid)
           delegate.log(:debug, "#{delegate.remote_ip}:#{delegate.remote_port} to #{delegate.local_ip}:#{delegate.local_port} Accepting connection from #{remote_host}")
@@ -54,7 +54,7 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
       end
     end
     
-    interpret(/^\s*MAIL\s+FROM:\s*<([^>]+)>\s*/) do |address|
+    interpret(/^\s*MAIL\s+FROM:\s*<([^>]+)>\s*/i) do |address|
       if (Remailer::EmailAddress.valid?(address))
         accept, message = will_accept_sender(address)
 
@@ -68,7 +68,7 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
       end
     end
 
-    interpret(/^\s*RCPT\s+TO:\s*<([^>]+)>\s*/) do |address|
+    interpret(/^\s*RCPT\s+TO:\s*<([^>]+)>\s*/i) do |address|
       if (@transaction.sender)
         if (Remailer::EmailAddress.valid?(address))
           accept, message = will_accept_recipient(address)
@@ -87,17 +87,17 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
       end
     end
     
-    interpret(/^\s*AUTH\s+PLAIN\s+(.*)\s*$/) do |auth|
+    interpret(/^\s*AUTH\s+PLAIN\s+(.*)\s*$/i) do |auth|
       # 235 2.7.0 Authentication successful
       delegate.send("235 whatever")
     end
 
-    interpret(/^\s*AUTH\s+PLAIN\s*$/) do
+    interpret(/^\s*AUTH\s+PLAIN\s*$/i) do
       # Multi-line authentication method
       enter_state(:auth_plain)
     end
     
-    interpret(/^\s*STARTTLS\s*$/) do
+    interpret(/^\s*STARTTLS\s*$/i) do
       if (@tls_started)
         delegate.send_line("454 TLS already started")
       elsif (delegate.tls?)
@@ -113,7 +113,7 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
       end
     end
     
-    interpret(/^\s*DATA\s*$/) do
+    interpret(/^\s*DATA\s*$/i) do
       if (@transaction.sender)
       else
         delegate.send_line("503 valid RCPT command must precede DATA")
@@ -123,17 +123,17 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
       delegate.send_line("354 Supply message data")
     end
 
-    interpret(/^\s*NOOP\s*$/) do |remote_host|
+    interpret(/^\s*NOOP\s*$/i) do |remote_host|
       delegate.send_line("250 OK")
     end
 
-    interpret(/^\s*RSET\s*$/) do |remote_host|
+    interpret(/^\s*RSET\s*$/i) do |remote_host|
       delegate.send_line("250 Reset OK")
       
       enter_state(:reset)
     end
     
-    interpret(/^\s*QUIT\s*$/) do
+    interpret(/^\s*QUIT\s*$/i) do
       delegate.send_line("221 #{delegate.server_name} closing connection")
 
       delegate.close_connection(true)
