@@ -89,7 +89,7 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
     
     interpret(/^\s*AUTH\s+PLAIN\s+(.*)\s*$/i) do |auth|
       # 235 2.7.0 Authentication successful
-      delegate.send("235 whatever")
+      delegate.send("235 If you insist")
     end
 
     interpret(/^\s*AUTH\s+PLAIN\s*$/i) do
@@ -116,7 +116,7 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
     interpret(/^\s*DATA\s*$/i) do
       if (@transaction.sender)
       else
-        delegate.send_line("503 valid RCPT command must precede DATA")
+        delegate.send_line("503 Valid RCPT command must precede DATA")
       end
       
       enter_state(:data)
@@ -161,7 +161,6 @@ class Remailer::SMTP::Server::Interpreter < Remailer::Interpreter
     
     default do |line|
       # RFC5321 4.5.2 - Leading dot is removed if line has content
-
       @transaction.data << (line.sub(/^\./, '') << Remailer::Constants::CRLF)
     end
   end

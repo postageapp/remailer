@@ -25,7 +25,7 @@ class Remailer::SMTP::Client::Interpreter < Remailer::Interpreter
   # Encodes the given data for an RFC5321-compliant stream where lines with
   # leading period chracters are escaped.
   def self.encode_data(data)
-    data.gsub(/((?:\r\n|\n)\.)/m, '\\1.')
+    data.gsub(/\r?\n/, "\r\n").gsub(/\r\n\./, "\r\n..")
   end
 
   # Encodes a string in Base64 as a single line
@@ -354,7 +354,7 @@ class Remailer::SMTP::Client::Interpreter < Remailer::Interpreter
       # Ensure that a blank line is sent after the last bit of email content
       # to ensure that the dot is on its own line.
       delegate.send_line
-      delegate.send_line(".")
+      delegate.send_line('.')
     end
     
     default do |reply_code, reply_message, continues|
