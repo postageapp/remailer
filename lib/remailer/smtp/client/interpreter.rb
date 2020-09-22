@@ -324,7 +324,7 @@ class Remailer::SMTP::Client::Interpreter < Remailer::Interpreter
       end
     end
     
-    interpret(500..599) do |reply_code, reply_message, continues|
+    interpret(400..599) do |reply_code, reply_message, continues|
       handle_reply_continuation(reply_code, reply_message, continues) do |reply_code, reply_message|
         delegate_call(:after_message_sent, reply_code, reply_message)
 
