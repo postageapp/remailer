@@ -3,17 +3,17 @@ require 'eventmachine'
 
 class Remailer::SMTP::Client < Remailer::AbstractConnection
   # == Submodules ===========================================================
-  
+
   autoload(:Interpreter, 'remailer/smtp/client/interpreter')
 
   # == Constants ============================================================
-  
+
   include Remailer::Constants
-  
+
   DEFAULT_TIMEOUT = 5
-  
+
   # == Properties ===========================================================
-  
+
   attr_accessor :active_message
   attr_accessor :remote, :max_size, :protocol, :hostname
   attr_accessor :pipelining, :tls_support, :auth_support
@@ -30,7 +30,7 @@ class Remailer::SMTP::Client < Remailer::AbstractConnection
   def self.default_timeout
     DEFAULT_TIMEOUT
   end
-  
+
   def self.default_port
     SMTP_PORT
   end
@@ -54,12 +54,12 @@ class Remailer::SMTP::Client < Remailer::AbstractConnection
   def self.open(smtp_server, options = nil, &block)
     super(smtp_server, options, &block)
   end
-  
+
   # == Instance Methods =====================================================
 
   # Called by AbstractConnection at the end of the initialize procedure
   def after_initialize
-    @protocol = :smtp
+    @protocol = :esmtp
     @error = nil
     @tls_support = nil
 
@@ -88,16 +88,16 @@ class Remailer::SMTP::Client < Remailer::AbstractConnection
     if (block_given?)
       self.class.warn_about_arguments(block, 1..2)
     end
-    
+
     message = {
       from: from,
       to: to,
       data: data,
       callback: block
     }
-    
+
     @messages << message
-    
+
     # If the connection is ready to send...
     if (@interpreter and @interpreter.state == :ready)
       # ...send the message right away.
@@ -113,23 +113,23 @@ class Remailer::SMTP::Client < Remailer::AbstractConnection
     if (block_given?)
       self.class.warn_about_arguments(block, 1..2)
     end
-    
+
     message = {
       from: from,
       to: to,
       test: true,
       callback: block
     }
-    
+
     @messages << message
-    
+
     # If the connection is ready to send...
     if (@interpreter and @interpreter.state == :ready)
       # ...send the message right away.
       after_ready
     end
   end
-  
+
   def after_unbind
     if (@active_message)
       debug_notification(:disconnect, "Disconnected by remote before transaction could be completed.")
@@ -147,13 +147,13 @@ class Remailer::SMTP::Client < Remailer::AbstractConnection
       debug_notification(:disconnect, "Disconnected by remote while connection was idle.")
     end
   end
-  
+
   # Returns true if the connection has been unbound by EventMachine, false
   # otherwise.
   def unbound?
     !!@unbound
   end
-  
+
   # Returns the current state of the active interpreter, or nil if no state
   # is assigned.
   def state
@@ -176,23 +176,23 @@ class Remailer::SMTP::Client < Remailer::AbstractConnection
 
   def resolve_hostname(hostname)
     record = Socket.gethostbyname(hostname)
-    
+
     # FIXME: IPv6 Support here
     address = (record and record[3])
-    
+
     if (address)
       debug_notification(:resolver, "Address #{hostname} resolved as #{address.unpack('CCCC').join('.')}")
     else
       debug_notification(:resolver, "Address #{hostname} could not be resolved")
     end
-    
+
     yield(address) if (block_given?)
 
     address
   rescue
     nil
   end
-  
+
   # Returns true if pipelining support has been detected on the connection,
   # false otherwise.
   def pipelining?
@@ -204,17 +204,17 @@ class Remailer::SMTP::Client < Remailer::AbstractConnection
   def tls_support?
     !!@tls_support
   end
-  
+
   # Returns true if the connection has been closed, false otherwise.
   def closed?
     !!@closed
   end
-  
+
   # Returns true if an error has occurred, false otherwise.
   def error?
     !!@error
   end
-  
+
   # Switches to use the SMTP interpreter for all subsequent communication
   def use_smtp_interpreter!
     @interpreter = Interpreter.new(delegate: self)
@@ -231,9 +231,9 @@ class Remailer::SMTP::Client < Remailer::AbstractConnection
 
   def after_ready
     super
-    
+
     return if (@active_message)
-  
+
     if (@active_message = @messages.shift)
       if (@interpreter.state == :ready)
         @interpreter.enter_state(:send)
@@ -242,7 +242,7 @@ class Remailer::SMTP::Client < Remailer::AbstractConnection
       if (callback = @options[:after_complete])
         callback.call
       end
-      
+
       @interpreter.enter_state(:quit)
     end
   end
