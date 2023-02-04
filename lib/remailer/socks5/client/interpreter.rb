@@ -9,12 +9,12 @@ class Remailer::SOCKS5::Client::Interpreter < Remailer::Interpreter
     gssapi: 1,
     username_password: 2
   }.freeze
-  
+
   SOCKS5_COMMAND = {
     connect: 1,
     bind: 2
   }.freeze
-  
+
   SOCKS5_REPLY = {
     0 => 'Succeeded',
     1 => 'General SOCKS server failure',
@@ -26,25 +26,27 @@ class Remailer::SOCKS5::Client::Interpreter < Remailer::Interpreter
     7 => 'Command not supported',
     8 => 'Address type not supported'
   }.freeze
-  
+
   SOCKS5_ADDRESS_TYPE = {
     ipv4: 1,
     domainname: 3,
     ipv6: 4
   }.freeze
-  
+
   # == State Mapping ========================================================
 
   state :initialized do
     enter do
       proxy_options = delegate.options[:proxy]
 
-      socks_methods = [ ]
-      
+      socks_methods = [
+        SOCKS5_METHOD[:no_auth]
+      ]
+
       if (proxy_options[:username])
         socks_methods << SOCKS5_METHOD[:username_password]
       end
-      
+
       proxy_options[:port] ||= Remailer::Constants::SOCKS5_PORT
 
       delegate.debug_notification(:proxy, "Initiating proxy connection through #{proxy_options[:host]}:#{proxy_options[:port]}")
@@ -57,24 +59,24 @@ class Remailer::SOCKS5::Client::Interpreter < Remailer::Interpreter
         ].flatten.pack('CCC*')
       )
     end
-    
+
     parse do |s|
       if (s.length >= 2)
         _version, method = s.slice!(0,2).unpack('CC')
-      
+
         method
       end
     end
-    
+
     interpret(SOCKS5_METHOD[:username_password]) do
       enter_state(:authentication)
     end
-    
+
     default do
       enter_state(:resolving_destination)
     end
   end
-  
+
   state :resolving_destination do
     enter do
       delegate.resolve_hostname(delegate.options[:host]) do |address|
@@ -83,11 +85,11 @@ class Remailer::SOCKS5::Client::Interpreter < Remailer::Interpreter
       end
     end
   end
-  
+
   state :connect_through_proxy do
     enter do
       delegate.proxy_connection_initiated!
-      
+
       if (@destination_address)
         delegate.debug_notification(:proxy, "Sending proxy connection request to #{@destination_address.unpack('CCCC').join('.')}:#{delegate.options[:port]}")
 
@@ -106,11 +108,11 @@ class Remailer::SOCKS5::Client::Interpreter < Remailer::Interpreter
         enter_state(:failed)
       end
     end
-    
+
     parse do |s|
       if (s.length >= 10)
         _version, reply, _reserved, address_type, address, port = s.slice!(0,10).unpack('CCCCNn')
-      
+
         [
           reply,
           {
@@ -121,18 +123,18 @@ class Remailer::SOCKS5::Client::Interpreter < Remailer::Interpreter
         ]
       end
     end
-  
+
     interpret(0) do
       enter_state(:connected)
     end
-    
+
     default do |reply|
       @reply = reply
 
       enter_state(:failed)
     end
   end
-  
+
   state :authentication do
     enter do
       delegate.debug_notification(:proxy, "Sending proxy authentication")
@@ -151,21 +153,21 @@ class Remailer::SOCKS5::Client::Interpreter < Remailer::Interpreter
         ].pack('CCA*CA*')
       )
     end
-    
+
     parse do |s|
     end
-    
+
     interpret(0) do
       enter_state(:connected)
     end
   end
-  
+
   state :connected do
     enter do
       delegate_call(:after_proxy_connected)
     end
   end
-  
+
   state :failed do
     enter do
       if (@error_message)
@@ -179,14 +181,14 @@ class Remailer::SOCKS5::Client::Interpreter < Remailer::Interpreter
       delegate.connect_notification(false, message)
       delegate.close_connection
     end
-    
+
     terminate
   end
 
   # == Class Methods ========================================================
 
   # == Instance Methods =====================================================
-  
+
   def label
     'SOCKS5'
   end
