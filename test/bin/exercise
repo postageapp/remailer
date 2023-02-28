@@ -4,7 +4,7 @@ require 'eventmachine'
 require 'optparse'
 require 'securerandom'
 
-$LOAD_PATH << File.expand_path('../../lib', File.dirname(__FILE__))
+$LOAD_PATH << File.expand_path('../../lib', __dir__)
 
 require 'remailer'
 

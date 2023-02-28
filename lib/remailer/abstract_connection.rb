@@ -1,22 +1,22 @@
 class Remailer::AbstractConnection < EventMachine::Connection
   # == Exceptions ===========================================================
-  
+
   class CallbackArgumentsRequired < Exception; end
 
   # == Constants ============================================================
-  
+
   include Remailer::Constants
 
   DEFAULT_TIMEOUT = 60
-  
+
   NOTIFICATIONS = [
     :debug,
     :error,
     :connect
   ].freeze
-  
+
   # == Properties ===========================================================
-  
+
   attr_accessor :options
   attr_reader :error, :error_message
 
@@ -25,7 +25,7 @@ class Remailer::AbstractConnection < EventMachine::Connection
   include EventMachine::Deferrable
 
   # == Class Methods ========================================================
-  
+
   # Defines the default timeout for connect operations.
   def self.default_timeout
     DEFAULT_TIMEOUT
@@ -59,10 +59,10 @@ class Remailer::AbstractConnection < EventMachine::Connection
     if (block_given?)
       options[:connect] = block
     end
-    
+
     host_name = host
     host_port = options[:port]
-    
+
     if (proxy_options = options[:proxy])
       host_name = proxy_options[:host]
       host_port = proxy_options[:port] || SOCKS5_PORT
@@ -78,7 +78,7 @@ class Remailer::AbstractConnection < EventMachine::Connection
       STDERR.puts "Callback must accept #{[ range.min, range.max ].uniq.join(' to ')} arguments but accepts #{proc.arity}"
     end
   end
-  
+
   def self.establish!(host_name, host_port, options)
     EventMachine.connect(host_name, host_port, self, options)
 
@@ -96,7 +96,7 @@ class Remailer::AbstractConnection < EventMachine::Connection
     when IO
       options[:connect].puts(e.to_s)
     end
-    
+
     case (options[:on_error])
     when Proc
       options[:on_error].call(e.to_s)
@@ -110,19 +110,19 @@ class Remailer::AbstractConnection < EventMachine::Connection
     when IO
       options[:debug].puts(e.to_s)
     end
-    
+
     case (options[:error])
     when Proc
       options[:error].call(:connect_error, e.to_s)
     when IO
       options[:error].puts(e.to_s)
     end
-    
+
     false
   end
-  
+
   # == Instance Methods =====================================================
-  
+
   # EventMachine will call this constructor and it is not to be called
   # directly. Use the Remailer::Connection.open method to facilitate the
   # correct creation of a new connection.
@@ -143,7 +143,7 @@ class Remailer::AbstractConnection < EventMachine::Connection
     @connecting_to_proxy = false
 
     @messages = [ ]
-  
+
     NOTIFICATIONS.each do |type|
       callback = @options[type]
 
@@ -151,13 +151,13 @@ class Remailer::AbstractConnection < EventMachine::Connection
         self.class.warn_about_arguments(callback, (2..2))
       end
     end
-  
+
     debug_notification(:options, @options.inspect)
-  
+
     reset_timeout!
 
     self.after_initialize
-    
+
   rescue Object => e
     self.class.report_exception(e, @options)
 
@@ -176,7 +176,7 @@ class Remailer::AbstractConnection < EventMachine::Connection
   def use_tls?
     !!@options[:use_tls]
   end
-  
+
   # Returns true if the connection has advertised TLS support, or false if
   # not availble or could not be detected.
   def tls_support?
@@ -194,13 +194,13 @@ class Remailer::AbstractConnection < EventMachine::Connection
       !!(@auth_support&.include?(type))
     end
   end
-  
+
   # Returns true if the connection will be using a proxy to connect, false
   # otherwise.
   def using_proxy?
     !!@options[:proxy]
   end
-  
+
   # Returns true if the connection will require authentication to complete,
   # that is a username has been supplied in the options, or false otherwise.
   def requires_authentication?
@@ -213,7 +213,7 @@ class Remailer::AbstractConnection < EventMachine::Connection
     @timeout = value.to_i
     @timeout = DEFAULT_TIMEOUT if (@timeout <= 0)
   end
-  
+
   def proxy_connection_initiated!
     @connecting_to_proxy = false
   end
@@ -221,13 +221,13 @@ class Remailer::AbstractConnection < EventMachine::Connection
   def proxy_connection_initiated?
     !!@connecting_to_proxy
   end
-  
+
   # This implements the EventMachine::Connection#completed method by
   # flagging the connection as estasblished.
   def connection_completed
     self.reset_timeout!
   end
-  
+
   # This implements the EventMachine::Connection#unbind method to capture
   # a connection closed event.
   def unbind
@@ -244,7 +244,7 @@ class Remailer::AbstractConnection < EventMachine::Connection
 
     send_callback(:on_disconnect)
   end
-  
+
   # Returns true if the connection has been unbound by EventMachine, false
   # otherwise.
   def unbound?
@@ -266,7 +266,7 @@ class Remailer::AbstractConnection < EventMachine::Connection
     else
       error_notification(:out_of_band, "Receiving data before a protocol has been established.")
     end
-    
+
   rescue Object => e
     self.class.report_exception(e, @options)
     STDERR.puts("[#{e.class}] #{e}") rescue nil
@@ -277,7 +277,7 @@ class Remailer::AbstractConnection < EventMachine::Connection
   def post_init
     self.set_timer!
   end
-  
+
   # Returns the current state of the active interpreter, or nil if no state
   # is assigned.
   def state
@@ -300,16 +300,16 @@ class Remailer::AbstractConnection < EventMachine::Connection
 
   def resolve_hostname(hostname)
     record = Socket.gethostbyname(hostname)
-    
+
     # FIXME: IPv6 Support here
     address = (record and record[3])
-    
+
     if (address)
       debug_notification(:resolver, "Address #{hostname} resolved as #{address.unpack('CCCC').join('.')}")
     else
       debug_notification(:resolver, "Address #{hostname} could not be resolved")
     end
-    
+
     yield(address) if (block_given?)
 
     address
@@ -321,19 +321,19 @@ class Remailer::AbstractConnection < EventMachine::Connection
   def reset_timeout!
     @timeout_at = Time.now + @timeout
   end
-  
+
   # Returns the number of seconds remaining until a timeout will occur, or
   # nil if no time-out is pending.
   def time_remaning
     @timeout_at and (@timeout_at.to_i - Time.now.to_i)
   end
-  
+
   def set_timer!
     @timer = EventMachine.add_periodic_timer(1) do
       self.check_for_timeouts!
     end
   end
-  
+
   def cancel_timer!
     if (@timer)
       @timer.cancel
@@ -357,17 +357,17 @@ class Remailer::AbstractConnection < EventMachine::Connection
     elsif (!@connected)
       remote_options = @options
       interpreter = @interpreter
-      
+
       if (self.proxy_connection_initiated?)
         remote_options = @options[:proxy]
       end
-      
+
       message = "Timed out before a connection could be established to #{remote_options[:host]}:#{remote_options[:port]}"
-      
+
       if (interpreter)
         message << " using #{interpreter.label}"
       end
-      
+
       connect_notification(false, message)
       debug_notification(:timeout, message)
       error_notification(:timeout, message)
@@ -385,12 +385,12 @@ class Remailer::AbstractConnection < EventMachine::Connection
 
     self.close_connection
   end
-  
+
   # Returns true if the connection has been closed, false otherwise.
   def closed?
     !!@closed
   end
-  
+
   # Returns true if an error has occurred, false otherwise.
   def error?
     !!@error
@@ -405,7 +405,7 @@ class Remailer::AbstractConnection < EventMachine::Connection
     end
 
     debug_notification(:closed, "Connection closed")
-    
+
     super
 
     @connected = false
@@ -417,10 +417,10 @@ class Remailer::AbstractConnection < EventMachine::Connection
 
   def after_ready
     @established = true
-    
+
     reset_timeout!
   end
-  
+
   # -- Callbacks and Notifications ------------------------------------------
 
   def interpreter_entered_state(interpreter, state)
@@ -445,16 +445,16 @@ class Remailer::AbstractConnection < EventMachine::Connection
     debug_notification(:tls, "Started")
     super
   end
-  
+
   def connected?
     @connected
   end
-  
+
   def connect_notification(code, message = nil)
     @connected = code
 
     send_notification(:connect, code, message || self.remote)
-    
+
     if (code)
       send_callback(:on_connect)
     end
@@ -473,7 +473,7 @@ class Remailer::AbstractConnection < EventMachine::Connection
 
   def message_callback(reply_code, reply_message)
     active_message = @active_message
-    
+
     if (callback = (active_message and active_message[:callback]))
       # The callback is screened in advance when assigned to ensure that it
       # has only 1 or 2 arguments. There should be no else here.
@@ -485,7 +485,7 @@ class Remailer::AbstractConnection < EventMachine::Connection
       end
     end
   end
-  
+
   def send_callback(type)
     if (callback = @options[type])
       case (callback.arity)

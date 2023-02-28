@@ -1,0 +1,108 @@
+#!/usr/bin/env ruby
+
+require 'eventmachine'
+require 'optparse'
+require 'securerandom'
+require 'base64'
+
+$LOAD_PATH << File.expand_path('../../lib', __dir__)
+
+require 'remailer'
+
+def as_size(s)
+  case (s)
+  when /\A(\d+)kb/i
+    $1.to_i * 1024
+  when /\A(\d+)mb/i
+    $1.to_i * 1024 * 1024
+  else
+    s.to_i
+  end
+end
+
+def email_content(attachment_size: nil)
+  [
+    'From: Remailer Test <remailer@postageapp.com>',
+    'To: Remailer Test <test@rfc5322.net>',
+    'Subject: Remailer Test',
+    '',
+    'Remailer test'
+  ].join("\r\n").tap do |s|
+    if (attachment_size)
+      s << "\r\n"
+      s << Base64.encode64(SecureRandom.bytes(attachment_size)).split(/\n/).join("\r\n")
+    end
+  end
+end
+
+options = {
+  count: 1,
+  concurrency: 1,
+  exchanger: 'test.rfc5322.net',
+  port: 25
+}
+
+opts = OptionParser.new do |parser|
+  parser.banner = "Usage: attachment [options]"
+  parser.on('-n', '--count=n') do |n|
+    options[:count] = n.to_i
+  end
+  parser.on('-c', '--concurrency=n') do |n|
+    options[:concurrency] = n.to_i
+  end
+  parser.on('-x', '--mx=s') do |s|
+    options[:exchanger] = s
+  end
+  parser.on('-p', '--port=s') do |s|
+    options[:port] = s.to_i
+  end
+  parser.on('-X', '--proxy=s') do |s|
+    server, port = s.split(/:/)
+
+    options[:proxy_host] = server
+
+    if (port)
+      options[:proxy_port] = port.to_i
+    end
+  end
+  parser.on('-s', '--attach=s', 'Add an arbitrary attachment') do |s|
+    options[:attachment_size] = as_size(s)
+  end
+  parser.on('-v', '--verbose') do
+    options[:verbose] = true
+  end
+end
+
+opts.parse(*ARGV)
+
+p options
+
+EventMachine.run do
+  client_options = {
+    port: options[:port],
+    debug: STDERR,
+    on_disconnect: -> {
+      EventMachine.stop_event_loop
+    }
+  }
+
+  if (options[:proxy_host])
+    client_options[:proxy] = {
+      host: options[:proxy_host],
+      port: options[:proxy_port]
+    }
+  end
+
+  client = Remailer::SMTP::Client.open(
+    options[:exchanger],
+    client_options
+  )
+
+  client.send_email(
+    'from@postageapp.net',
+    'test@rfc5322.net',
+    email_content(attachment_size: options[:attachment_size])
+  )
+
+  client.close_when_complete!
+end

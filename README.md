@@ -23,7 +23,7 @@ make one or more requests to send email messages.
         'smtp.google.com',
         debug: STDERR
       )
-      
+
       # Send a single email message through the client at the earliest
       # opportunity. Note that the client will need to be fully
       # established first and this may take upwards of ten seconds.
@@ -40,7 +40,7 @@ make one or more requests to send email messages.
         'to@example.com',
         email_content
       )
-      
+
       # Tells the client to close out when finished.
       client.close_when_complete!
     end
@@ -55,7 +55,7 @@ example is given here where the information is simply dumped on STDOUT:
         puts "#{type}> #{message.inspect}"
       }
     )
-    
+
 The types defined include:
 
   * :send - Raw data sent by the client
@@ -68,7 +68,7 @@ initialized:
     client.debug do |type, message|
       STDERR.puts "%s> %s" % [ type, message.inspect ]
     end
-    
+
 It's also possible to define a handler for when the message queue has been
 exhausted:
 
@@ -105,4 +105,4 @@ release is made.
 
 ## Copyright
 
-Copyright (c) 2010-2019 Scott Tadman, PostageApp Ltd.
+Copyright (c) 2010-2023 Scott Tadman, PostageApp Ltd.
